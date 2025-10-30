@@ -1,0 +1,123 @@
+﻿🎯 1. Mục tiêu sản phẩm
+Tên gợi ý: DeepEquity Agent
+ Tầm nhìn: Xây dựng một hệ thống AI có thể hoạt động như một sell-side equity analyst thực thụ — tự động thu thập dữ liệu, hiểu báo cáo tài chính, theo dõi tin tức và tạo báo cáo đầu tư chuyên sâu, tương đương phân tích viên tại Goldman Sachs hoặc Blackstone.
+Mục tiêu cụ thể:
+* Tự động đọc, hiểu và phân tích 10-K, 10-Q, Earnings Transcript, Investor Deck.
+
+* Kết nối dữ liệu định lượng (price, fundamentals, macro) với dữ liệu định tính (news, management tone, risk factors).
+
+* Sinh ra equity report hoàn chỉnh gồm: Investment Thesis, Valuation, Risks, Catalysts, và Forecast Model.
+
+* Có khả năng tự phản biện, cập nhật và tái huấn luyện dựa trên feedback của người dùng hoặc analyst lead.
+
+________________
+
+
+🧩 2. Kiến trúc hệ thống tổng thể
+Multi-Agent Architecture
+Agent
+	Nhiệm vụ chính
+	Kỹ năng chính
+	Data Extractor Agent
+	Crawl và chuẩn hoá dữ liệu từ SEC EDGAR, Yahoo Finance, AlphaVantage, SeekingAlpha
+	Python, BeautifulSoup, API integration
+	Financial Understanding Agent
+	Đọc và hiểu ngôn ngữ tài chính trong 10-K/10-Q, trích xuất metric & narrative
+	LLM + Financial Ontology (FinGPT, BloombergGPT)
+	Valuation Agent
+	Tự động chọn mô hình định giá phù hợp (DCF, EV/EBITDA, Multiples) và tính toán
+	Python, Pandas, Scikit-Learn
+	Sentiment & Tone Agent
+	Phân tích sentiment và tone từ transcript & news
+	NLP (FinBERT, OpenAI embedding)
+	Report Composer Agent
+	Tạo báo cáo hoàn chỉnh theo cấu trúc chuyên nghiệp
+	RAG + Template + LangGraph chain
+	Supervisor Agent
+	Giám sát, phản biện kết quả, yêu cầu tái chạy phần chưa đạt
+	LangGraph + Feedback loop
+	________________
+
+
+🧠 3. Năng lực tác vụ chính
+1. Reading & Understanding
+   * Dùng financial text parser để hiểu bảng cân đối, P&L, cash flow.
+
+   * Trích xuất automatically: revenue breakdown, margins, segment growth, risk sections, capex trend.
+
+   * Áp dụng semantic chunking để hiểu ngữ cảnh thay vì keyword search.
+
+2. Quantitative Integration
+      * Kết nối real-time API: price, benchmark, index, rates.
+
+      * Sinh dashboard nội bộ để so sánh cross-firm metrics (ROE, ROIC, WACC, multiples).
+
+      * Hỗ trợ “what-if analysis”: thay đổi assumption và xem valuation sensitivity.
+
+3. Thesis Generation
+         * Tự tạo bull vs bear case dựa trên dữ liệu lịch sử và sentiment.
+
+         * Sinh ra summary theo cấu trúc chuyên nghiệp:
+Thesis → Catalysts → Risks → Valuation → Recommendation.
+
+4. Model Output
+            * Xuất kết quả thành 1 báo cáo đầy đủ (PDF, Markdown, hoặc interactive notebook).
+
+            * Có thể chọn phong cách: Buy-side deep-dive, Sell-side report, hoặc Investment memo for fund.
+
+________________
+
+
+⚙️ 4. Pipeline kỹ thuật (LangGraph / RAG / ML)
+SEC Crawler → Data Cleaner → Financial Chunking → Vector Store (Qdrant)
+      ↓
+Embedding (FinText) → Contextual Retrieval
+      ↓
+Agent Chain (LangGraph)
+      ↓
+   [Supervisor Agent]
+      ↓
+Thesis Builder → Valuation Modeler → Report Composer
+      ↓
+Report (PDF/HTML/JSON)
+
+
+Tech Stack đề xuất
+               * LLM: GPT-5 API / Claude / FinGPT (fine-tuned on financial texts)
+
+               * Framework: LangGraph hoặc CrewAI (multi-agent orchestration)
+
+               * Storage: Qdrant / ChromaDB (vector store for context retrieval)
+
+               * Data Pipeline: Airflow / Prefect + SEC/EDGAR + AlphaVantage API
+
+               * Computation: Python (NumPy, Pandas, Scikit-Learn, PyFinance)
+
+               * Frontend: Next.js + Tailwind (dashboard/report viewer)
+
+               * Backend: FastAPI / Node.js (serve models & pipeline calls)
+
+________________
+
+
+📊 5. Báo cáo đầu ra (Deliverable)
+Mẫu report gồm 5 phần:
+                  1. Executive Summary – Tóm tắt thesis, rating, target price.
+
+                  2. Business Overview & Segment Analysis – Mô hình kinh doanh, thị phần, CAGR.
+
+                  3. Valuation & Forecast – DCF table, sensitivity, peer multiples.
+
+                  4. Catalysts & Risks – Event driver, regulation, cost trends.
+
+                  5. Analyst Commentary – Nhận xét, tone management, outlook.
+
+Tất cả đều có source traceability (link ngược lại đến câu trong 10-K hoặc news gốc).
+Có thể xuất ra dạng:
+                     * PDF report (cho nhà đầu tư)
+
+                     * JSON (cho integration với BI tool hoặc Copilot khác)
+
+                     * Interactive dashboard (biểu đồ và valuation sheet)
+
+________________
