@@ -32,7 +32,7 @@ export default function RootLayout({
           <header className="border-b">
             <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
               <Link href="/" className="flex items-center gap-2">
-                <img src="/equisynth-logo.svg" alt="EquiSynth logo" className="h-6 w-6" />
+                <img src="/equisynth-logo.png" alt="EquiSynth logo" className="h-6 w-6" />
                 <span className="font-semibold">EquiSynth</span>
               </Link>
               <AuthButton />

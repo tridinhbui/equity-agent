@@ -1,6 +1,12 @@
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
+export const runtime = "nodejs";
+
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+	console.error("[NextAuth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
+}
+
 const handler = NextAuth({
 	providers: [
 		GoogleProvider({
