@@ -4,31 +4,67 @@ EquiSynth is a Next.js web app that provides a multi‑agent equity research cop
 
 ## Getting Started
 
-1. Create a `.env.local` in `equisynth-web/` with the following:
-
+1. `.env.local`:
 ```
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=replace-with-a-strong-secret
 GOOGLE_CLIENT_ID=your-google-oauth-client-id
 GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
+SEC_USER_AGENT=EquiSynth (your_email@example.com)
+ALPHAVANTAGE_API_KEY=your-alphavantage-api-key
+FINNHUB_API_KEY=your-finnhub-api-key
+DATABASE_URL=postgresql://user:password@localhost:5432/equisynth
 ```
 
-2. Install dependencies and run the dev server:
+**Getting API Keys:**
+- Google OAuth: [Google Cloud Console](https://console.cloud.google.com/)
+- AlphaVantage (free): [Get API Key](https://www.alphavantage.co/support/#api-key)
+- **Finnhub (free, 60 calls/min)**: [Register here](https://finnhub.io/register) - for real-time stock quotes
 
+**Database (Optional):**
+- Without `DATABASE_URL`: App uses file-based storage (works fine for development)
+- With Postgres: Enables filing metadata tracking, metrics storage, and better scaling
+- To initialize database: `POST /api/db/init` after setting DATABASE_URL
+
+2. Install deps and run:
 ```bash
 npm install
 npm run dev
 ```
 
-3. Configure Google OAuth (console.cloud.google.com):
-- Create OAuth Client ID (Web).
-- Authorized JavaScript origin: `http://localhost:3000`.
-- Authorized redirect URI: `http://localhost:3000/api/auth/callback/google`.
+## Retrieval (local embeddings)
+- We use `@xenova/transformers` (JS-only), model `Xenova/all-MiniLM-L6-v2`.
+- No OpenAI key needed. Embeddings are saved to `embeddings.json` beside chunks.
 
-## Features
-- Google Sign‑In powered by NextAuth.
-- Minimal header with brand and session state.
-- Tailwind CSS and App Router.
+Workflow:
+1) Fetch filing → Download & parse → Section + chunk
+2) Embed (local) → Ask (semantic search)
+
+## Output tree
+```
+/data/{TICKER}/{FORM}_{FILED}/
+  raw.html|raw.txt|raw.bin
+  text.txt
+  tables.json
+  sections.json
+  chunks.jsonl
+  embeddings.json
+```
+
+Chunk metadata example:
+```json
+{
+  "text": "...",
+  "metadata": {
+    "ticker": "AAPL",
+    "form": "10-K",
+    "filed": "2024-11-01",
+    "section": "Risk Factors",
+    "char_start": 123456,
+    "char_end": 125321
+  }
+}
+```
 
 ## Branding
 - App name: EquiSynth
