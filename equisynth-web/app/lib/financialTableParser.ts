@@ -75,7 +75,14 @@ function isCashFlowStatement(table: string[][]): boolean {
  * Clean and normalize cell values
  */
 function cleanCellValue(val: string): string | number {
-	const cleaned = val.trim().replace(/\s+/g, " ");
+	// First, decode HTML entities
+	let cleaned = val
+		.replace(/&#160;/g, ' ')  // Non-breaking space
+		.replace(/&nbsp;/g, ' ')   // Non-breaking space
+		.replace(/&amp;/g, '&')    // Ampersand
+		.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec)) // Numeric entities
+		.trim()
+		.replace(/\s+/g, " ");
 	
 	// Try to parse as number
 	// Common formats: 1,234.56  (1,234)  $1,234  123.45%
@@ -123,17 +130,33 @@ export function parseFinancialTable(rawTable: string[][]): FinancialTable | null
 		title = "Cash Flow Statement";
 	}
 
-	// First row is usually headers
-	const headerRow = rawTable[0];
+	// Find the header row - look for dates/years in the first few rows
+	let headerRowIndex = 0;
+	let headerRow = rawTable[0];
+	
+	// Check if row 1 contains dates (like "September 28, 2024")
+	if (rawTable.length > 1) {
+		const secondRow = rawTable[1];
+		const hasDatePattern = secondRow.some(cell => {
+			const cleaned = cell.trim();
+			return /\d{4}/.test(cleaned) || /September|October|November|December|January/.test(cleaned);
+		});
+		
+		if (hasDatePattern) {
+			headerRowIndex = 1;
+			headerRow = rawTable[1];
+		}
+	}
+	
 	const headers = headerRow.map((h) => h.trim());
 	const periods = extractPeriods(headerRow);
 
-	// Parse data rows
+	// Parse data rows (skip rows up to and including header)
 	const rows: FinancialTable["rows"] = [];
 	let hasNegatives = false;
 	let hasPercentages = false;
 
-	for (let i = 1; i < rawTable.length; i++) {
+	for (let i = headerRowIndex + 1; i < rawTable.length; i++) {
 		const row = rawTable[i];
 		if (row.length === 0) continue;
 
@@ -193,21 +216,22 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	if (incomeStatement) {
 		for (const row of incomeStatement.rows) {
 			const label = row.label.toLowerCase();
-			const latestValue = row.values[0];
+			// Get the first numeric value (skip $ signs)
+			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
 			
-			if (label.includes("revenue") || label.includes("net sales")) {
+			if ((label.includes("revenue") || label.includes("net sales")) && label.includes("total")) {
 				metrics.revenue = latestValue;
 			}
-			if (label.includes("gross profit")) {
+			if (label.includes("gross profit") || label.includes("gross margin")) {
 				metrics.grossProfit = latestValue;
 			}
-			if (label.includes("operating income") && !label.includes("non-")) {
+			if (label.includes("operating income") && !label.includes("non-") && !label.includes("other")) {
 				metrics.operatingIncome = latestValue;
 			}
-			if (label.includes("net income") && !label.includes("per share")) {
+			if (label === "net income" || (label.includes("net income") && !label.includes("per share") && !label.includes("adjustment"))) {
 				metrics.netIncome = latestValue;
 			}
-			if (label.includes("earnings per share") || label.includes("eps")) {
+			if (label.includes("earnings per share") || (label.includes("diluted") && !label.includes("weighted"))) {
 				metrics.eps = latestValue;
 			}
 		}
@@ -228,25 +252,40 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	const balanceSheet = tables.find((t) => t.type === "balance_sheet");
 	if (balanceSheet) {
 		for (const row of balanceSheet.rows) {
-			const label = row.label.toLowerCase();
-			const latestValue = row.values[0];
+			// Clean HTML entities from labels too!
+			let label = row.label
+				.replace(/&#160;/g, ' ')
+				.replace(/&nbsp;/g, ' ')
+				.replace(/&#8217;/g, "'")  // Apostrophe
+				.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+				.toLowerCase()
+				.trim();
 			
-			if (label.includes("total assets")) {
+			// Get the first numeric value (skip $ signs)
+			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			
+			if (label.includes("total assets") && !label.includes("liabilities")) {
 				metrics.totalAssets = latestValue;
 			}
-			if (label.includes("total liabilities")) {
+			if (label.includes("total liabilities") && !label.includes("equity")) {
 				metrics.totalLiabilities = latestValue;
 			}
-			if (label.includes("stockholders' equity") || label.includes("shareholders' equity")) {
+			// Match "total shareholders' equity" properly (but NOT "total liabilities and shareholders' equity")
+			if (label.includes("stockholders") && label.includes("equity") && label.includes("total") && 
+			    !label.includes("beginning") && !label.includes("ending") && !label.includes("liabilities")) {
+				metrics.totalEquity = latestValue;
+			}
+			if (label.includes("shareholders") && label.includes("equity") && label.includes("total") && 
+			    !label.includes("beginning") && !label.includes("ending") && !label.includes("liabilities")) {
 				metrics.totalEquity = latestValue;
 			}
 			if (label.includes("cash and cash equivalents")) {
 				metrics.cash = latestValue;
 			}
-			if (label.includes("current assets")) {
+			if (label.includes("total current assets")) {
 				metrics.currentAssets = latestValue;
 			}
-			if (label.includes("current liabilities")) {
+			if (label.includes("total current liabilities")) {
 				metrics.currentLiabilities = latestValue;
 			}
 		}
@@ -260,6 +299,16 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 		}
 		if (metrics.totalEquity && metrics.totalAssets) {
 			metrics.equityRatio = (Number(metrics.totalEquity) / Number(metrics.totalAssets)) * 100;
+		}
+		
+		// Calculate ROE (Return on Equity)
+		if (metrics.netIncome && metrics.totalEquity) {
+			metrics.roe = (Number(metrics.netIncome) / Number(metrics.totalEquity)) * 100;
+		}
+		
+		// Calculate ROA (Return on Assets)
+		if (metrics.netIncome && metrics.totalAssets) {
+			metrics.roa = (Number(metrics.netIncome) / Number(metrics.totalAssets)) * 100;
 		}
 	}
 
@@ -282,6 +331,145 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 			if (label.includes("free cash flow")) {
 				metrics.freeCashFlow = latestValue;
 			}
+			if (label.includes("capital expenditure") || label.includes("capex")) {
+				metrics.capex = latestValue;
+			}
+		}
+
+		// Calculate Free Cash Flow if not directly available
+		if (!metrics.freeCashFlow && metrics.operatingCashFlow && metrics.capex) {
+			metrics.freeCashFlow = Number(metrics.operatingCashFlow) - Math.abs(Number(metrics.capex));
+		}
+	}
+
+	// Extract additional items needed for ROIC and WACC
+	if (balanceSheet) {
+		let inNonCurrentSection = false;
+		let inCurrentSection = false;
+		
+		for (const row of balanceSheet.rows) {
+			// Clean HTML entities from labels
+			let label = row.label
+				.replace(/&#160;/g, ' ')
+				.replace(/&nbsp;/g, ' ')
+				.replace(/&#8217;/g, "'")
+				.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+				.toLowerCase()
+				.trim();
+			
+			// Track which section we're in
+			if (label.includes("non-current liabilities")) {
+				inNonCurrentSection = true;
+				inCurrentSection = false;
+			} else if (label.includes("current liabilities")) {
+				inCurrentSection = true;
+				inNonCurrentSection = false;
+			}
+			
+			// Get the first numeric value (skip $ signs)
+			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			
+			// For ROIC calculation - look for "Term debt" (Apple's terminology) or traditional labels
+			if (label.includes("long-term debt") || label.includes("long term debt") || 
+			    (label.includes("term debt") && (label.includes("non-current") || inNonCurrentSection))) {
+				metrics.longTermDebt = latestValue;
+			}
+			if (label.includes("short-term debt") || label.includes("short term debt") || 
+			    label.includes("current portion of long-term debt") ||
+			    (label.includes("term debt") && (label.includes("current") || inCurrentSection) && !label.includes("non-current"))) {
+				metrics.shortTermDebt = latestValue;
+			}
+			// Also check for "Commercial paper" which is short-term debt
+			if (label.includes("commercial paper")) {
+				const commercialPaper = typeof latestValue === 'number' ? latestValue : 0;
+				metrics.shortTermDebt = (metrics.shortTermDebt || 0) + commercialPaper;
+			}
+		}
+	}
+
+	// Calculate ROIC (Return on Invested Capital)
+	// ROIC = NOPAT / Invested Capital
+	// NOPAT = Operating Income * (1 - Tax Rate)
+	// Invested Capital = Total Debt + Total Equity - Cash
+	if (metrics.operatingIncome && metrics.totalEquity) {
+		// Estimate tax rate from net income and operating income
+		let taxRate = 0.21; // Default corporate tax rate
+		if (metrics.netIncome && metrics.operatingIncome) {
+			const impliedTax = 1 - (Number(metrics.netIncome) / Number(metrics.operatingIncome));
+			if (impliedTax > 0 && impliedTax < 1) {
+				taxRate = impliedTax;
+			}
+		}
+
+		const nopat = Number(metrics.operatingIncome) * (1 - taxRate);
+		
+		// Calculate total debt
+		let totalDebt = 0;
+		if (metrics.longTermDebt) totalDebt += Number(metrics.longTermDebt);
+		if (metrics.shortTermDebt) totalDebt += Number(metrics.shortTermDebt);
+		
+		// Invested Capital = Debt + Equity - Cash
+		const investedCapital = totalDebt + Number(metrics.totalEquity) - (metrics.cash ? Number(metrics.cash) : 0);
+		
+		if (investedCapital > 0) {
+			metrics.roic = (nopat / investedCapital) * 100;
+		}
+	}
+
+	// Calculate WACC (Weighted Average Cost of Capital)
+	// WACC = (E/V * Re) + (D/V * Rd * (1 - Tc))
+	// E = Market value of equity (approximated by book value)
+	// D = Market value of debt (approximated by book value)
+	// V = E + D
+	// Re = Cost of equity (estimated using simplified model)
+	// Rd = Cost of debt (estimated from interest expense)
+	// Tc = Tax rate
+	if (metrics.totalEquity && (metrics.longTermDebt || metrics.shortTermDebt)) {
+		// Calculate total debt
+		let totalDebt = 0;
+		if (metrics.longTermDebt) totalDebt += Number(metrics.longTermDebt);
+		if (metrics.shortTermDebt) totalDebt += Number(metrics.shortTermDebt);
+		
+		if (totalDebt > 0) {
+			const equity = Number(metrics.totalEquity);
+			const totalValue = equity + totalDebt;
+			
+			// Estimate cost of equity (simplified: assume 10% + risk premium based on ROE)
+			let costOfEquity = 0.10; // Base rate
+			if (metrics.roe && metrics.roe > 0) {
+				// If ROE is high, assume higher cost of equity
+				// Convert ROE from percentage to decimal (divide by 100)
+				const roeDecimal = Number(metrics.roe) / 100;
+				costOfEquity = 0.08 + (roeDecimal * 0.5);
+			}
+			
+			// Estimate cost of debt (simplified: assume 5% for investment grade)
+			// In reality, this should be calculated from interest expense / total debt
+			let costOfDebt = 0.05;
+			if (incomeStatement) {
+				for (const row of incomeStatement.rows) {
+					const label = row.label.toLowerCase();
+					if (label.includes("interest expense") || label.includes("interest paid")) {
+						const interestExpense = Math.abs(Number(row.values[0]));
+						costOfDebt = interestExpense / totalDebt;
+						break;
+					}
+				}
+			}
+			
+			// Tax rate
+			let taxRate = 0.21;
+			if (metrics.netIncome && metrics.operatingIncome) {
+				const impliedTax = 1 - (Number(metrics.netIncome) / Number(metrics.operatingIncome));
+				if (impliedTax > 0 && impliedTax < 1) {
+					taxRate = impliedTax;
+				}
+			}
+			
+			// Calculate WACC
+			const equityWeight = equity / totalValue;
+			const debtWeight = totalDebt / totalValue;
+			metrics.wacc = (equityWeight * costOfEquity + debtWeight * costOfDebt * (1 - taxRate)) * 100;
 		}
 	}
 

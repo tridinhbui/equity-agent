@@ -21,16 +21,26 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} antialiased bg-white text-slate-900`}>
         <Providers>
-          <header className="border-b bg-white">
-            <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
-              <Link href="/" className="flex items-center gap-2">
-                <img src="/equisynth-logo.png" alt="EquiSynth logo" className="h-6 w-6" />
-                <span className="font-semibold">EquiSynth</span>
-              </Link>
-              <AuthButton />
+          <header className="border-b bg-white shadow-sm">
+            <div className="mx-auto max-w-7xl px-4 py-3">
+              <div className="flex items-center justify-between mb-3">
+                <Link href="/" className="flex items-center gap-2">
+                  <img src="/equisynth-logo.png" alt="EquiSynth logo" className="h-6 w-6" />
+                  <span className="font-semibold text-lg">EquiSynth</span>
+                </Link>
+                <AuthButton />
+              </div>
+              <nav className="flex gap-4">
+                <Link href="/dashboard" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
+                  📊 Data Extractor
+                </Link>
+                <Link href="/financial-understanding" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
+                  💡 Financial Understanding
+                </Link>
+              </nav>
             </div>
           </header>
-          <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+          <main>{children}</main>
         </Providers>
       </body>
     </html>
