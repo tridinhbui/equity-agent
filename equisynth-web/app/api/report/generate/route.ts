@@ -805,12 +805,14 @@ export async function GET(req: NextRequest) {
 					body: JSON.stringify({ text: analysisText }),
 				});
 					
-					if (sentimentRes.ok) {
-						sentimentAnalysis = await sentimentRes.json();
-						
-						// Filter out meaningless quotes from sentiment analysis results
-						// But keep at least some quotes if they exist (even if not perfect)
-						if (sentimentAnalysis.keyQuotes && sentimentAnalysis.keyQuotes.length > 0) {
+				if (sentimentRes.ok) {
+					sentimentAnalysis = await sentimentRes.json();
+					console.log(`✅ Sentiment analysis complete: ${sentimentAnalysis.keyQuotes?.length || 0} quotes found`);
+					
+					// Minimal filtering - only remove absolutely obvious junk
+					// Keep everything else, even if it's cautious/vague
+					if (sentimentAnalysis.keyQuotes && sentimentAnalysis.keyQuotes.length > 0) {
+						console.log(`📊 Original quotes: ${sentimentAnalysis.keyQuotes.length}`);
 							const filtered = sentimentAnalysis.keyQuotes.filter((quote: any) => {
 								const text = quote.text || '';
 								const lower = text.toLowerCase();
