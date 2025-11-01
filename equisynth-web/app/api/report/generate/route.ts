@@ -813,25 +813,26 @@ export async function GET(req: NextRequest) {
 					// Keep everything else, even if it's cautious/vague
 					if (sentimentAnalysis.keyQuotes && sentimentAnalysis.keyQuotes.length > 0) {
 						console.log(`📊 Original quotes: ${sentimentAnalysis.keyQuotes.length}`);
+							// Very minimal filtering - only remove absolutely obvious junk
 							const filtered = sentimentAnalysis.keyQuotes.filter((quote: any) => {
 								const text = quote.text || '';
-								const lower = text.toLowerCase();
+								const lower = text.toLowerCase().trim();
 								
-								// Filter out obvious boilerplate and headers
+								// Only filter out:
+								// 1. Section headers (Item X.)
 								if (/^(item|part)\s+\d+[a-z]?\.?\s*$/i.test(text.trim())) return false;
-								if (/^forward-looking statements provide/i.test(lower)) return false;
-								if (/^security ownership of/i.test(lower)) return false;
-								if (/^certain relationships and/i.test(lower)) return false;
-								if (text.trim().length < 30) return false; // Reduced from 50 to keep more quotes
 								
-								// Filter out sentences that are mostly uppercase (likely headers)
-								const words = text.trim().split(/\s+/);
-								if (words.length < 8 && words.filter((w: string) => /^[A-Z]+$/.test(w)).length > words.length / 2) {
-									return false;
-								}
+								// 2. Very short quotes (< 20 chars)
+								if (text.length < 20) return false;
 								
+								// 3. Completely uppercase headers (no lowercase letters)
+								if (/^[^a-z]+$/.test(text)) return false;
+								
+								// Keep everything else - even if it's cautious/vague
 								return true;
 							});
+							
+							console.log(`📊 After minimal filtering: ${filtered.length} quotes`);
 							
 							// Additional filtering: remove quotes that are clearly section headers
 							const finalFiltered = filtered.filter((quote: any) => {
