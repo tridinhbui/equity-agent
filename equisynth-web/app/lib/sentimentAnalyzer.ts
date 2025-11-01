@@ -217,11 +217,20 @@ function extractKeyQuotes(text: string, minLength: number = 20): Array<{text: st
 			// Filter out section headers and boilerplate
 			const lower = trimmed.toLowerCase();
 			
-			// Skip section headers (Item X, Part X, etc.)
+			// Skip section headers (Item X, Part X, etc.) - more comprehensive patterns
 			if (/^(item|part)\s+\d+[a-z]?\.?\s*$/i.test(trimmed)) return false;
 			
 			// Skip table of contents style entries
 			if (/^(item|part)\s+\d+[a-z]?\s+[A-Z][^.!?]{0,50}$/.test(trimmed)) return false;
+			
+			// Skip common section header patterns that appear in 10-K filings
+			if (/^(controls and procedures|other information|disclosure regarding|exhibits and financial|director independence|stockholder matters|principal account)/i.test(trimmed)) return false;
+			
+			// Skip lines that are just section titles without actual content (e.g., "Item 9B." followed by just the number)
+			if (/^[A-Z][a-z\s]+(?:Item|Part)\s+\d+[a-z]?\.?\s*$/i.test(trimmed)) return false;
+			
+			// Skip if sentence is just a number or very short section identifier
+			if (/^(item|part)\s+\d+[a-z]?\.?\s*[A-Z]?[a-z]*$/i.test(trimmed) && trimmed.length < 60) return false;
 			
 			// Skip legal boilerplate that starts with common patterns
 			const boilerplatePatterns = [
@@ -235,8 +244,27 @@ function extractKeyQuotes(text: string, minLength: number = 20): Array<{text: st
 				/^principal account/i,
 				/provide current expectations of future events/i,
 				/does not directly relate to any historical/i,
+				/many of the forward-looking statements/i,
+				/statements in this form/i,
+				/references to.*form.*10-k/i,
+				/part\s+[ivx]+\s*,\s*item\s+\d+/i,
+				/under the heading/i,
 			];
 			if (boilerplatePatterns.some(pattern => pattern.test(lower))) return false;
+			
+			// Skip sentences that are meta-references to the filing itself
+			if (/(this\s+form\s+10-?k|form\s+10-?k|part\s+[ivx]+\s*,\s*item\s+\d+|under\s+the\s+heading)/i.test(lower) && 
+				(/forward-looking|statement|disclaimer|caution/i.test(lower) || trimmed.length < 150)) {
+				return false;
+			}
+			
+			// Skip common legal disclaimers
+			if (/assumes no obligation/i.test(lower)) return false;
+			if (/except as required by law/i.test(lower)) return false;
+			if (/unless otherwise stated/i.test(lower) && /fiscal calendar/i.test(lower)) return false;
+			if (/references to particular years/i.test(lower)) return false;
+			if (/exhibit and financial statement schedules/i.test(lower)) return false;
+			if (/based on.*fiscal calendar/i.test(lower)) return false;
 			
 			// Skip sentences that are clearly legal definitions/disclaimers
 			if (lower.includes('forward-looking') && lower.includes('expectations') && lower.includes('assumptions')) {
@@ -248,6 +276,19 @@ function extractKeyQuotes(text: string, minLength: number = 20): Array<{text: st
 			
 			// Skip sentences that are primarily formatting/headers
 			if (trimmed.split(/\s+/).length < 5 && /^[A-Z\s]+$/.test(trimmed)) return false;
+			
+			// Skip sentences that are clearly section headers (all caps, short, no verbs)
+			const words = trimmed.split(/\s+/);
+			if (words.length < 8 && words.every(w => /^[A-Z][a-z]*$/.test(w) || /^[A-Z]+$/.test(w))) {
+				// Check if it contains verbs - if no verbs, likely a header
+				const hasVerb = /(is|are|was|were|has|have|will|would|can|could|should|may|might|do|does|did|provide|includes|requires|refers|relates|describes|indicates|represents)/i.test(trimmed);
+				if (!hasVerb) return false;
+			}
+			
+			// Skip if sentence is just a section identifier followed by minimal text
+			if (/^(item|part)\s+\d+[a-z]?\.?\s*[A-Z][a-z\s]{0,100}$/i.test(trimmed) && trimmed.length < 80) {
+				return false;
+			}
 			
 			return true;
 		})
@@ -279,9 +320,38 @@ function extractKeyQuotes(text: string, minLength: number = 20): Array<{text: st
 				sentiment,
 			};
 		})
-		.filter(q => q.confidence >= 3) // Only quotes with meaningful confidence
+		.filter(q => {
+			// First, filter by confidence
+			if (q.confidence < 2) return false;
+			
+			// Then, filter out quotes that are clearly boilerplate
+			const text = q.text.toLowerCase();
+			
+			// Skip obvious legal disclaimers and procedural text
+			if (/assumes no obligation/i.test(text)) return false;
+			if (/except as required by law/i.test(text)) return false;
+			if (/exhibit and financial statement schedules/i.test(text)) return false;
+			if (/item\s+\d+[a-z]?\.?\s*$/i.test(q.text.trim())) return false;
+			
+			// Skip if it's ONLY talking about the filing itself (meta-text without business content)
+			// But allow if it also has business discussion
+			const isOnlyMetaText = /^(this form|these statements|such statements|the company assumes|unless otherwise stated.*fiscal calendar)/i.test(text);
+			if (isOnlyMetaText) return false;
+			
+			// Allow quotes that have business/financial content OR action verbs (not requiring both)
+			const hasActionVerb = /(expect|believe|anticipate|plan|strategy|focus|grow|expand|improve|increase|decrease|achieve|deliver|generate|create|develop|launch|introduce|invest|operate|manage|execute|will|should)/i.test(q.text);
+			const hasBusinessContext = /(revenue|sales|income|profit|margin|growth|market|product|service|strategy|plan|outlook|forecast|guidance|performance|result|business|operating|cash|financial|earnings|customer|demand|supply|competitive|segment|company|we|our)/i.test(q.text);
+			
+			// Must have at least business context OR action verb (more lenient)
+			// But if confidence is very low (< 3) and has neither, exclude it
+			if (q.confidence < 3 && !hasActionVerb && !hasBusinessContext) {
+				return false;
+			}
+			
+			return true;
+		})
 		.sort((a, b) => b.confidence - a.confidence) // Sort by confidence
-		.slice(0, 10); // Top 10 quotes
+		.slice(0, 15); // Increased from 10 to 15 to have more candidates after filtering
 }
 
 /**

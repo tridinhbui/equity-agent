@@ -46,6 +46,9 @@ export default function RootLayout({
                 <Link href="/report" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
                   📄 Report Composer
                 </Link>
+                <Link href="/supervisor" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
+                  🔍 Supervisor
+                </Link>
               </nav>
             </div>
           </header>

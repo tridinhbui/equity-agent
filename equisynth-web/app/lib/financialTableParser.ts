@@ -497,14 +497,15 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 			const equity = Number(metrics.totalEquity);
 			const totalValue = equity + totalDebt;
 			
-			// Estimate cost of equity (simplified: assume 10% + risk premium based on ROE)
-			let costOfEquity = 0.10; // Base rate
-			if (metrics.roe && metrics.roe > 0) {
-				// If ROE is high, assume higher cost of equity
-				// Convert ROE from percentage to decimal (divide by 100)
-				const roeDecimal = Number(metrics.roe) / 100;
-				costOfEquity = 0.08 + (roeDecimal * 0.5);
-			}
+		// Estimate cost of equity (simplified: use sector-based approach)
+		// NOTE: This is a rough estimate. For accurate WACC, use Valuation Agent which considers
+		// market cap, beta, risk-free rate, and market risk premium.
+		// Financial Understanding Agent provides a basic estimate only.
+		let costOfEquity = 0.10; // Base 10% for large-cap companies
+		
+		// Don't use ROE-based calculation as it's unreliable (ROE can be misleading)
+		// Instead, use a conservative sector-based estimate
+		// This will be overridden by Valuation Agent's more sophisticated calculation
 			
 			// Estimate cost of debt (simplified: assume 5% for investment grade)
 			// In reality, this should be calculated from interest expense / total debt
@@ -529,10 +530,25 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				}
 			}
 			
-			// Calculate WACC
-			const equityWeight = equity / totalValue;
-			const debtWeight = totalDebt / totalValue;
-			metrics.wacc = (equityWeight * costOfEquity + debtWeight * costOfDebt * (1 - taxRate)) * 100;
+		// Calculate WACC
+		const equityWeight = equity / totalValue;
+		const debtWeight = totalDebt / totalValue;
+		let calculatedWACC = (equityWeight * costOfEquity + debtWeight * costOfDebt * (1 - taxRate)) * 100;
+		
+		// Cap WACC at 25% - if calculated higher, it's likely an error
+		// This prevents unrealistic values from flawed calculations
+		if (calculatedWACC > 25) {
+			calculatedWACC = 25; // Cap at reasonable maximum
+		}
+		
+		// Only set WACC if it's reasonable (between 3% and 25%)
+		if (calculatedWACC >= 3 && calculatedWACC <= 25) {
+			metrics.wacc = calculatedWACC;
+		} else {
+			// Don't set WACC if calculation is clearly wrong
+			// Valuation Agent will provide a more accurate WACC
+			metrics.wacc = null; // Mark as unavailable
+		}
 		}
 	}
 

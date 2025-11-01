@@ -754,49 +754,73 @@ export async function GET(req: NextRequest) {
 			valuation.note = 'Missing required data for DCF calculation. Please run Financial Understanding and Valuation agents first.';
 		}
 
-		// Step 4: Analyze sentiment from narrative sections (MD&A)
+		// Step 4: Analyze sentiment from narrative sections
+		// Try Business Description first (often has more substantive management statements)
+		// Fall back to MD&A if Business Description doesn't have enough content
 		let sentimentAnalysis: any = null;
 		try {
-			const mdaChunks = await getNarrativeChunks(ticker, form, filed, 'MD&A');
-			if (mdaChunks.length > 0) {
-				// Clean the text before analysis - remove headers and boilerplate
-				let mdaText = mdaChunks
+			// Try Business Description first - usually has better management statements
+			let analysisText = '';
+			let source = 'Business Description';
+			
+			const businessChunks = await getNarrativeChunks(ticker, form, filed, 'Business Description');
+			if (businessChunks.length > 0) {
+				analysisText = businessChunks
 					.map(chunk => chunk.trim())
 					.filter(chunk => {
-						// Filter out section headers and boilerplate
+						// Minimal filtering - just remove obvious junk
 						const lower = chunk.toLowerCase();
 						if (/^(item|part)\s+\d+[a-z]?\.?\s*$/i.test(chunk.trim())) return false;
-						if (/^forward-looking statements provide/i.test(lower)) return false;
-						if (/^security ownership of/i.test(lower)) return false;
-						if (/^certain relationships and/i.test(lower)) return false;
-						if (chunk.trim().length < 50) return false; // Too short to be meaningful
+						if (chunk.trim().length < 30) return false;
 						return true;
 					})
 					.join(' ')
-					.substring(0, 5000); // Limit for analysis
-				
-				if (mdaText.trim().length > 100) { // Only analyze if we have substantial content
-					const sentimentRes = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/sentiment/analyze`, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ text: mdaText }),
-					});
+					.substring(0, 5000);
+			}
+			
+			// If Business Description doesn't have enough content, try MD&A
+			if (analysisText.length < 200) {
+				source = 'MD&A';
+				const mdaChunks = await getNarrativeChunks(ticker, form, filed, 'MD&A');
+				if (mdaChunks.length > 0) {
+					analysisText = mdaChunks
+						.map(chunk => chunk.trim())
+						.filter(chunk => {
+							// Minimal filtering
+							const lower = chunk.toLowerCase();
+							if (/^(item|part)\s+\d+[a-z]?\.?\s*$/i.test(chunk.trim())) return false;
+							if (chunk.trim().length < 30) return false;
+							return true;
+						})
+						.join(' ')
+						.substring(0, 5000);
+				}
+			}
+			
+			if (analysisText.trim().length > 100) {
+				console.log(`📝 Analyzing sentiment from ${source} (${analysisText.length} chars)`);
+				const sentimentRes = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/sentiment/analyze`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ text: analysisText }),
+				});
 					
 					if (sentimentRes.ok) {
 						sentimentAnalysis = await sentimentRes.json();
 						
 						// Filter out meaningless quotes from sentiment analysis results
-						if (sentimentAnalysis.keyQuotes) {
-							sentimentAnalysis.keyQuotes = sentimentAnalysis.keyQuotes.filter((quote: any) => {
+						// But keep at least some quotes if they exist (even if not perfect)
+						if (sentimentAnalysis.keyQuotes && sentimentAnalysis.keyQuotes.length > 0) {
+							const filtered = sentimentAnalysis.keyQuotes.filter((quote: any) => {
 								const text = quote.text || '';
 								const lower = text.toLowerCase();
 								
-								// Filter out boilerplate and headers
+								// Filter out obvious boilerplate and headers
 								if (/^(item|part)\s+\d+[a-z]?\.?\s*$/i.test(text.trim())) return false;
 								if (/^forward-looking statements provide/i.test(lower)) return false;
 								if (/^security ownership of/i.test(lower)) return false;
 								if (/^certain relationships and/i.test(lower)) return false;
-								if (text.trim().length < 50) return false; // Too short
+								if (text.trim().length < 30) return false; // Reduced from 50 to keep more quotes
 								
 								// Filter out sentences that are mostly uppercase (likely headers)
 								const words = text.trim().split(/\s+/);
@@ -806,6 +830,73 @@ export async function GET(req: NextRequest) {
 								
 								return true;
 							});
+							
+							// Additional filtering: remove quotes that are clearly section headers
+							const finalFiltered = filtered.filter((quote: any) => {
+								const text = quote.text || '';
+								const lower = text.toLowerCase().trim();
+								
+								// Remove quotes that are just section identifiers
+								if (/^(item|part)\s+\d+[a-z]?\.?\s*$/i.test(text.trim())) return false;
+								if (/^(controls and procedures|other information|disclosure regarding|exhibits|director independence)/i.test(lower)) return false;
+								
+								// Remove quotes that are too short or don't contain meaningful management language
+								if (text.length < 40) return false;
+								
+								// Skip if it's a legal disclaimer about forward-looking statements or references to other sections
+								if (/(many of the forward-looking|statements in this form|references to.*form.*10-?k|part\s+[ivx]+\s*,\s*item|under the heading)/i.test(lower)) {
+									return false;
+								}
+								
+								// Skip specific obvious legal disclaimers
+								if (/assumes no obligation/i.test(lower)) return false;
+								if (/except as required by law/i.test(lower)) return false;
+								if (/exhibit and financial statement schedules/i.test(lower)) return false;
+								
+								// Skip if it's ONLY meta-text (talking about the filing itself) without business content
+								const isOnlyMetaText = /^(this form|these statements|such statements|the company assumes|unless otherwise stated.*fiscal calendar)/i.test(lower);
+								if (isOnlyMetaText) return false;
+								
+								// Prefer quotes with business/financial language OR action verbs (more lenient)
+								const hasBusinessLanguage = /(revenue|sales|income|profit|margin|growth|market|product|service|strategy|plan|outlook|expect|forecast|guidance|performance|result|business|operating|cash|financial|earnings|customer|demand|supply|competitive|segment|company|we|our)/i.test(text);
+								const hasActionVerb = /(expect|believe|anticipate|plan|strategy|focus|grow|expand|improve|increase|decrease|achieve|deliver|generate|create|develop|launch|introduce|invest|operate|manage|execute|will|should)/i.test(text);
+								
+								// Keep if it has business language OR action verb (more permissive)
+								// Only exclude if it has neither AND is very short
+								if (!hasBusinessLanguage && !hasActionVerb && text.length < 60) {
+									return false;
+								}
+								
+								return true;
+							});
+							
+							// If filtering removed all quotes but we had some, keep at least the top 5 (more permissive)
+							if (finalFiltered.length === 0 && sentimentAnalysis.keyQuotes.length > 0) {
+								// Try to find quotes with business language or action verbs
+								const meaningfulQuotes = sentimentAnalysis.keyQuotes.filter((quote: any) => {
+									const text = quote.text || '';
+									const lower = text.toLowerCase();
+									
+									// Skip obvious boilerplate
+									if (/assumes no obligation|except as required by law|exhibit and financial statement schedules/i.test(lower)) {
+										return false;
+									}
+									
+									// Keep if it has business language OR action verbs
+									return /(revenue|sales|income|profit|margin|growth|market|product|service|strategy|plan|outlook|expect|forecast|guidance|performance|result|business|operating|cash|financial|earnings|company|we|our)/i.test(text) ||
+										   /(expect|believe|anticipate|plan|strategy|focus|grow|expand|improve|will|should|may)/i.test(text);
+								});
+								
+								if (meaningfulQuotes.length > 0) {
+									console.log(`⚠️ Filtered quotes, but keeping ${meaningfulQuotes.length} meaningful quotes.`);
+									sentimentAnalysis.keyQuotes = meaningfulQuotes.slice(0, 5);
+								} else {
+									console.log(`⚠️ No obviously meaningful quotes found. Keeping top 5 quotes anyway to show something.`);
+									sentimentAnalysis.keyQuotes = sentimentAnalysis.keyQuotes.slice(0, 5);
+								}
+							} else {
+								sentimentAnalysis.keyQuotes = finalFiltered.length > 0 ? finalFiltered : sentimentAnalysis.keyQuotes.slice(0, 5);
+							}
 						}
 					}
 				}
