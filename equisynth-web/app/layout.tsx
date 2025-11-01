@@ -37,6 +37,15 @@ export default function RootLayout({
                 <Link href="/financial-understanding" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
                   💡 Financial Understanding
                 </Link>
+                <Link href="/valuation" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
+                  💰 Valuation
+                </Link>
+                <Link href="/sentiment" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
+                  🎭 Sentiment & Tone
+                </Link>
+                <Link href="/report" className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-100 transition-all">
+                  📄 Report Composer
+                </Link>
               </nav>
             </div>
           </header>
