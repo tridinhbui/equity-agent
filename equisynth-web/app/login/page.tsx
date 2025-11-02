@@ -7,7 +7,6 @@ export default function LoginPage() {
 		<div className="min-h-screen bg-white flex items-center justify-center px-4">
 			<div className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm">
 				<div className="flex items-center gap-3 mb-6 justify-center">
-					<img src="/equisynth-logo.png" alt="EquiSynth logo" className="h-10 w-10" />
 					<h1 className="text-2xl font-semibold">EquiSynth</h1>
 				</div>
 				<p className="text-gray-700 text-center mb-6">

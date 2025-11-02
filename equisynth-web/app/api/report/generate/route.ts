@@ -813,8 +813,9 @@ export async function GET(req: NextRequest) {
 					// Keep everything else, even if it's cautious/vague
 					if (sentimentAnalysis.keyQuotes && sentimentAnalysis.keyQuotes.length > 0) {
 						console.log(`📊 Original quotes: ${sentimentAnalysis.keyQuotes.length}`);
-							// Very minimal filtering - only remove absolutely obvious junk
-							const filtered = sentimentAnalysis.keyQuotes.filter((quote: any) => {
+						
+						// Very minimal filtering - only remove absolutely obvious junk
+						const filtered = sentimentAnalysis.keyQuotes.filter((quote: any) => {
 								const text = quote.text || '';
 								const lower = text.toLowerCase().trim();
 								
@@ -834,73 +835,34 @@ export async function GET(req: NextRequest) {
 							
 							console.log(`📊 After minimal filtering: ${filtered.length} quotes`);
 							
-							// Additional filtering: remove quotes that are clearly section headers
+							// Use the minimally filtered quotes (already filtered above)
+							// Only remove the most egregious boilerplate
 							const finalFiltered = filtered.filter((quote: any) => {
 								const text = quote.text || '';
 								const lower = text.toLowerCase().trim();
 								
-								// Remove quotes that are just section identifiers
-								if (/^(item|part)\s+\d+[a-z]?\.?\s*$/i.test(text.trim())) return false;
-								if (/^(controls and procedures|other information|disclosure regarding|exhibits|director independence)/i.test(lower)) return false;
-								
-								// Remove quotes that are too short or don't contain meaningful management language
-								if (text.length < 40) return false;
-								
-								// Skip if it's a legal disclaimer about forward-looking statements or references to other sections
-								if (/(many of the forward-looking|statements in this form|references to.*form.*10-?k|part\s+[ivx]+\s*,\s*item|under the heading)/i.test(lower)) {
+								// Only remove absolutely clear legal disclaimers (keep everything else)
+								if (/^(assumes no obligation|except as required by law|exhibit and financial statement schedules)$/i.test(text.trim())) {
 									return false;
 								}
 								
-								// Skip specific obvious legal disclaimers
-								if (/assumes no obligation/i.test(lower)) return false;
-								if (/except as required by law/i.test(lower)) return false;
-								if (/exhibit and financial statement schedules/i.test(lower)) return false;
-								
-								// Skip if it's ONLY meta-text (talking about the filing itself) without business content
-								const isOnlyMetaText = /^(this form|these statements|such statements|the company assumes|unless otherwise stated.*fiscal calendar)/i.test(lower);
-								if (isOnlyMetaText) return false;
-								
-								// Prefer quotes with business/financial language OR action verbs (more lenient)
-								const hasBusinessLanguage = /(revenue|sales|income|profit|margin|growth|market|product|service|strategy|plan|outlook|expect|forecast|guidance|performance|result|business|operating|cash|financial|earnings|customer|demand|supply|competitive|segment|company|we|our)/i.test(text);
-								const hasActionVerb = /(expect|believe|anticipate|plan|strategy|focus|grow|expand|improve|increase|decrease|achieve|deliver|generate|create|develop|launch|introduce|invest|operate|manage|execute|will|should)/i.test(text);
-								
-								// Keep if it has business language OR action verb (more permissive)
-								// Only exclude if it has neither AND is very short
-								if (!hasBusinessLanguage && !hasActionVerb && text.length < 60) {
-									return false;
-								}
-								
+								// Keep everything else - even cautious/vague statements are better than nothing
 								return true;
 							});
 							
-							// If filtering removed all quotes but we had some, keep at least the top 5 (more permissive)
-							if (finalFiltered.length === 0 && sentimentAnalysis.keyQuotes.length > 0) {
-								// Try to find quotes with business language or action verbs
-								const meaningfulQuotes = sentimentAnalysis.keyQuotes.filter((quote: any) => {
-									const text = quote.text || '';
-									const lower = text.toLowerCase();
-									
-									// Skip obvious boilerplate
-									if (/assumes no obligation|except as required by law|exhibit and financial statement schedules/i.test(lower)) {
-										return false;
-									}
-									
-									// Keep if it has business language OR action verbs
-									return /(revenue|sales|income|profit|margin|growth|market|product|service|strategy|plan|outlook|expect|forecast|guidance|performance|result|business|operating|cash|financial|earnings|company|we|our)/i.test(text) ||
-										   /(expect|believe|anticipate|plan|strategy|focus|grow|expand|improve|will|should|may)/i.test(text);
-								});
-								
-								if (meaningfulQuotes.length > 0) {
-									console.log(`⚠️ Filtered quotes, but keeping ${meaningfulQuotes.length} meaningful quotes.`);
-									sentimentAnalysis.keyQuotes = meaningfulQuotes.slice(0, 5);
-								} else {
-									console.log(`⚠️ No obviously meaningful quotes found. Keeping top 5 quotes anyway to show something.`);
-									sentimentAnalysis.keyQuotes = sentimentAnalysis.keyQuotes.slice(0, 5);
-								}
+							// Always keep quotes - prioritize meaningful ones but fallback to all if needed
+							if (finalFiltered.length > 0) {
+								sentimentAnalysis.keyQuotes = finalFiltered.slice(0, 5); // Top 5
+								console.log(`✅ Keeping ${finalFiltered.length} quotes after filtering`);
+							} else if (filtered.length > 0) {
+								// If final filtering removed all, use the minimally filtered ones
+								sentimentAnalysis.keyQuotes = filtered.slice(0, 5);
+								console.log(`⚠️ Final filtering removed all, using ${filtered.length} minimally filtered quotes`);
 							} else {
-								sentimentAnalysis.keyQuotes = finalFiltered.length > 0 ? finalFiltered : sentimentAnalysis.keyQuotes.slice(0, 5);
+								// Last resort: keep original quotes (top 5)
+								sentimentAnalysis.keyQuotes = sentimentAnalysis.keyQuotes.slice(0, 5);
+								console.log(`⚠️ All filtering removed quotes, keeping top 5 original quotes`);
 							}
-						}
 					}
 				}
 			}

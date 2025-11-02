@@ -68,4 +68,3 @@ Chunk metadata example:
 
 ## Branding
 - App name: EquiSynth
-- Logo: `public/equisynth-logo.svg`
