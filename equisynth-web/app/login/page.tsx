@@ -1,31 +1,82 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import AppShell from "@/components/AppShell";
+import AnalyticsDecor from "@/components/AnalyticsDecor";
 
 export default function LoginPage() {
 	return (
-		<div className="min-h-screen bg-white flex items-center justify-center px-4">
-			<div className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm">
-				<div className="flex items-center gap-3 mb-6 justify-center">
-					<h1 className="text-2xl font-semibold">EquiSynth</h1>
+		<AppShell showTabs={false} showHeaderActions={false}>
+			<div style={{ position: "relative", minHeight: "70vh" }} className="bg-grid">
+				<div className="login-halo" />
+				<AnalyticsDecor />
+				<div style={{ display: "grid", placeItems: "center", minHeight: "70vh" }}>
+					<div className="card" style={{ maxWidth: 520, position: "relative", zIndex: 1 }}>
+						<h1 style={{ textAlign: "center", marginTop: 4, marginBottom: 8 }}>
+							Welcome to EquiSynth
+						</h1>
+						<p className="muted" style={{ textAlign: "center" }}>
+							Deep Equity Agent automates equity research: reads documents, connects real-time data, analyzes sentiment, and performs valuations to generate traceable reports.
+						</p>
+
+						<ul style={{ marginTop: 12, marginBottom: 16, color: "var(--muted)" }}>
+							<li>• Read 10‑K/10‑Q, transcripts, investor decks</li>
+							<li>• Real-time data: price, fundamentals, macro</li>
+							<li>• Sentiment & Tone: FinBERT & embeddings</li>
+							<li>• Automatic valuation: DCF, EV/EBITDA, multiples</li>
+						</ul>
+
+						<div className="badges">
+							<div className="badge-item">🔒 Read-only OAuth</div>
+							<div className="badge-item">🧾 SEC-first data</div>
+							<div className="badge-item">🗄️ You own your data</div>
+						</div>
+
+						<button 
+							className="btn btn-primary" 
+							style={{ width: "100%", marginTop: 20 }}
+							onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+						>
+							Sign in with Google
+						</button>
+
+						<div className="muted" style={{ marginTop: 10, fontSize: 12, textAlign: "center" }}>
+							By continuing, you agree to EquiSynth's terms of service.
+						</div>
+					</div>
 				</div>
-				<p className="text-gray-700 text-center mb-6">
-					Deep Equity Agent tự động hoá nghiên cứu cổ phiếu: đọc hiểu tài liệu, kết nối dữ liệu realtime, phân tích sentiment và định giá để xuất báo cáo có thể truy vết nguồn.
-				</p>
-				<ul className="text-sm text-gray-700 space-y-2 mb-6">
-					<li>• Đọc 10‑K/10‑Q, transcript, investor deck</li>
-					<li>• Dữ liệu realtime: giá, fundamentals, macro</li>
-					<li>• Sentiment & Tone: FinBERT & embeddings</li>
-					<li>• Định giá tự động: DCF, EV/EBITDA, multiples</li>
-				</ul>
-				<button
-					className="w-full px-6 py-3 rounded-lg bg-gray-900 text-white hover:bg-black transition"
-					onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
-				>
-					Sign in with Google
-				</button>
-				<p className="text-xs text-gray-500 mt-3 text-center">Tiếp tục tức là bạn đồng ý với điều khoản của EquiSynth.</p>
+
+				{/* Feature chips under the card */}
+				<div style={{ display: "grid", placeItems: "center", marginTop: -50, position: "relative", zIndex: 1 }}>
+					<div className="feature-belt">
+						<span className="feature-chip">10-K / 10-Q Parsing</span>
+						<span className="feature-chip">Earnings Calls</span>
+						<span className="feature-chip">Valuation (DCF/Comps)</span>
+						<span className="feature-chip">News & Alerts</span>
+					</div>
+				</div>
+
+				{/* Live snapshot */}
+				<div className="card live-snap" style={{ position: "relative", zIndex: 1 }}>
+					<div className="row">
+						<span className="pill">S&P 500 +0.7%</span>
+						<span className="pill">Nasdaq +0.9%</span>
+						<span className="pill">AAPL +1.4%</span>
+						<span className="pill">TSLA -0.6%</span>
+						<span className="pill">NVDA +2.1%</span>
+					</div>
+				</div>
+
+				{/* Logos belt */}
+				<div style={{ display: "grid", placeItems: "center", position: "relative", zIndex: 1 }}>
+					<div className="logo-belt">
+						<span>SEC EDGAR</span>
+						<span>Yahoo Finance</span>
+						<span>Alpha Vantage</span>
+						<span>FRED</span>
+					</div>
+				</div>
 			</div>
-		</div>
+		</AppShell>
 	);
 }
