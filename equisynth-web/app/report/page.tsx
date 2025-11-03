@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import AppShell from '@/components/AppShell';
+import AgentSurface from '@/components/AgentSurface';
 
 interface ReportSection {
 	[key: string]: string;
@@ -139,152 +141,150 @@ ${sections.analyst_commentary || ''}
 	};
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white p-8">
-			<div className="max-w-7xl mx-auto">
-				{/* Header */}
-				<div className="mb-8">
-					<h1 className="text-4xl font-bold mb-2">📄 Report Composer Agent</h1>
-					<p className="text-gray-300">
-						Generate comprehensive equity research reports from all agent analyses
-					</p>
-				</div>
-
-				{/* Input Form */}
-				<div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 mb-8">
-					<h2 className="text-2xl font-bold mb-6">Report Parameters</h2>
-					
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
-								Ticker Symbol
-							</label>
-							<input
-								type="text"
-								value={ticker}
-								onChange={(e) => setTicker(e.target.value.toUpperCase())}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-								placeholder="AAPL"
-							/>
-						</div>
-
-						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
-								Form Type
-							</label>
-							<select
-								value={form}
-								onChange={(e) => setForm(e.target.value)}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-							>
-								<option value="10-K">10-K (Annual Report)</option>
-								<option value="10-Q">10-Q (Quarterly Report)</option>
-							</select>
-						</div>
-
-						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
-								Year
-							</label>
-							<input
-								type="number"
-								value={year}
-								onChange={(e) => setYear(parseInt(e.target.value))}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-								placeholder="2024"
-							/>
-						</div>
-
-						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
-								Filed Date
-							</label>
-							<input
-								type="date"
-								value={filedDate}
-								onChange={(e) => setFiledDate(e.target.value)}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-							/>
-						</div>
-					</div>
-
-					<button
-						onClick={handleGenerateReport}
-						disabled={loading}
-						className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+		<AppShell>
+			<div className="bg-grid max-w-7xl mx-auto px-4 md:px-6">
+				<div className="agent-sunset">
+					<AgentSurface
+						title="📄 Report Composer Agent"
+						subtitle="Generate comprehensive equity research reports from all agent analyses"
+						className="mt-6"
 					>
-						{loading ? '🔄 Generating Report...' : '🚀 Generate Equity Research Report'}
-					</button>
+						<div className="glass-card p-6 md:p-8">
+							<h2 className="text-2xl font-bold mb-6 text-gray-900">Report Parameters</h2>
+							
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-2">
+										Ticker Symbol
+									</label>
+									<input
+										type="text"
+										value={ticker}
+										onChange={(e) => setTicker(e.target.value.toUpperCase())}
+										className="w-full px-4 py-2 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:ring-2 ring-agent focus:outline-none transition-all"
+										placeholder="AAPL"
+									/>
+								</div>
 
-					{error && (
-						<div className="mt-4 bg-red-500/20 border border-red-500 rounded-lg p-4">
-							<p className="text-red-200">❌ {error}</p>
-						</div>
-					)}
-				</div>
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-2">
+										Form Type
+									</label>
+									<select
+										value={form}
+										onChange={(e) => setForm(e.target.value)}
+										className="w-full px-4 py-2 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:ring-2 ring-agent focus:outline-none transition-all"
+									>
+										<option value="10-K">10-K (Annual Report)</option>
+										<option value="10-Q">10-Q (Quarterly Report)</option>
+									</select>
+								</div>
 
-				{/* Generated Report */}
-				{report && (
-					<div className="space-y-8">
-						{/* Report Header & Export */}
-						<div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 flex justify-between items-center">
-							<div>
-								<h2 className="text-2xl font-bold mb-2">
-									Equity Research Report: {report.metadata.ticker}
-								</h2>
-								<p className="text-gray-300 text-sm">
-									Generated: {new Date(report.metadata.generatedAt).toLocaleString()} | 
-									Filing: {report.metadata.form} | 
-									Filed: {report.metadata.filed}
-								</p>
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-2">
+										Year
+									</label>
+									<input
+										type="number"
+										value={year}
+										onChange={(e) => setYear(parseInt(e.target.value))}
+										className="w-full px-4 py-2 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:ring-2 ring-agent focus:outline-none transition-all"
+										placeholder="2024"
+									/>
+								</div>
+
+								<div>
+									<label className="block text-sm font-medium text-gray-700 mb-2">
+										Filed Date
+									</label>
+									<input
+										type="date"
+										value={filedDate}
+										onChange={(e) => setFiledDate(e.target.value)}
+										className="w-full px-4 py-2 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:ring-2 ring-agent focus:outline-none transition-all"
+									/>
+								</div>
 							</div>
-							<div className="flex gap-4">
-								<select
-									value={exportFormat}
-									onChange={(e) => setExportFormat(e.target.value as 'markdown' | 'json')}
-									className="px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-								>
-									<option value="markdown">Markdown</option>
-									<option value="json">JSON</option>
-								</select>
-								<button
-									onClick={handleExport}
-									className="px-6 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-cyan-600 transition"
-								>
-									📥 Export Report
-								</button>
-							</div>
-						</div>
 
-						{/* Report Sections */}
-						{Object.entries(report.sections).map(([key, content]) => (
-							<div
-								key={key}
-								className="bg-white/10 backdrop-blur-md rounded-2xl p-8"
+							<button
+								onClick={handleGenerateReport}
+								disabled={loading}
+								className="w-full px-6 py-3 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-lg hover:from-amber-600 hover:to-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-xl focus:ring-2 ring-agent focus:outline-none"
 							>
-								<div
-									className="markdown-content text-gray-200 leading-relaxed"
-									dangerouslySetInnerHTML={{
-										__html: content
-											.replace(/## (.+)/g, '<h2 class="text-3xl font-bold text-white mt-8 mb-4 border-b border-white/20 pb-2">$1</h2>')
-											.replace(/### (.+)/g, '<h3 class="text-2xl font-bold text-purple-300 mt-6 mb-3">$1</h3>')
-											.replace(/\*\*(.+?)\*\*/g, '<strong class="text-yellow-300 font-semibold">$1</strong>')
-											.replace(/\| (.+) \|/g, '<tr><td class="px-4 py-2">$1</td></tr>')
-											.replace(/\n\n/g, '</p><p class="mb-4">')
-											.replace(/\n/g, '<br>')
-											.replace(/✅/g, '<span class="text-green-400">✅</span>')
-											.replace(/⚠️/g, '<span class="text-yellow-400">⚠️</span>')
-											.replace(/<table>/g, '<table class="w-full border-collapse border border-white/30 mt-4 mb-4"><thead class="bg-white/10"><tr>')
-											.replace(/<\/table>/g, '</thead></table>')
-											.replace(/<tr>/g, '<tr class="border-b border-white/20">')
-											.replace(/<td>/g, '<td class="px-4 py-2 border border-white/20">'),
-									}}
-								/>
+								{loading ? '🔄 Generating Report...' : '🚀 Generate Equity Research Report'}
+							</button>
+
+						{error && (
+							<div className="mt-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg p-4">
+								<p className="text-red-700 font-medium">❌ {error}</p>
 							</div>
-						))}
+						)}
 					</div>
-				)}
+				</AgentSurface>
+
+			{/* Generated Report */}
+			{report && (
+				<div className="space-y-6 mt-6">
+					{/* Report Header & Export */}
+					<div className="glass-card p-6 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+						<div>
+							<h2 className="text-2xl font-bold mb-2 text-gray-900">
+								Equity Research Report: {report.metadata.ticker}
+							</h2>
+							<p className="text-gray-600 text-sm">
+								Generated: {new Date(report.metadata.generatedAt).toLocaleString()} | 
+								Filing: {report.metadata.form} | 
+								Filed: {report.metadata.filed}
+							</p>
+						</div>
+						<div className="flex gap-4">
+							<select
+								value={exportFormat}
+								onChange={(e) => setExportFormat(e.target.value as 'markdown' | 'json')}
+								className="px-4 py-2 bg-white border-2 border-gray-300 rounded-lg text-gray-900 focus:ring-2 ring-agent focus:outline-none transition-all"
+							>
+								<option value="markdown">Markdown</option>
+								<option value="json">JSON</option>
+							</select>
+							<button
+								onClick={handleExport}
+								className="px-6 py-2 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-lg hover:from-amber-600 hover:to-orange-600 transition shadow-md hover:shadow-xl focus:ring-2 ring-agent focus:outline-none"
+							>
+								📥 Export Report
+							</button>
+						</div>
+					</div>
+
+					{/* Report Sections */}
+					{Object.entries(report.sections).map(([key, content]) => (
+						<div
+							key={key}
+							className="glass-card p-6 md:p-8"
+						>
+							<div
+								className="markdown-content text-gray-800 leading-relaxed"
+								dangerouslySetInnerHTML={{
+									__html: content
+										.replace(/## (.+)/g, '<h2 class="text-3xl font-bold text-gray-900 mt-8 mb-4 border-b border-gray-300 pb-2">$1</h2>')
+										.replace(/### (.+)/g, '<h3 class="text-2xl font-bold text-amber-700 mt-6 mb-3">$1</h3>')
+										.replace(/\*\*(.+?)\*\*/g, '<strong class="text-orange-600 font-semibold">$1</strong>')
+										.replace(/\| (.+) \|/g, '<tr><td class="px-4 py-2">$1</td></tr>')
+										.replace(/\n\n/g, '</p><p class="mb-4">')
+										.replace(/\n/g, '<br>')
+										.replace(/✅/g, '<span class="text-green-600">✅</span>')
+										.replace(/⚠️/g, '<span class="text-amber-600">⚠️</span>')
+										.replace(/<table>/g, '<table class="w-full border-collapse border border-gray-300 mt-4 mb-4 bg-white"><thead class="bg-amber-50"><tr>')
+										.replace(/<\/table>/g, '</thead></table>')
+										.replace(/<tr>/g, '<tr class="border-b border-gray-200">')
+										.replace(/<td>/g, '<td class="px-4 py-2 border border-gray-200">'),
+								}}
+							/>
+						</div>
+					))}
+				</div>
+			)}
 			</div>
 		</div>
+		</AppShell>
 	);
 }
-

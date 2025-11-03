@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import AppShell from '@/components/AppShell';
+import AgentSurface from '@/components/AgentSurface';
 import { DCFInputs, DCFResult } from '@/app/lib/dcfModel';
 
 export default function ValuationPage() {
@@ -371,6 +373,7 @@ export default function ValuationPage() {
 	};
 
 	return (
+		<AppShell>
 		<div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
 			<div className="max-w-7xl mx-auto">
 				{/* Header */}
@@ -517,6 +520,7 @@ export default function ValuationPage() {
 				)}
 			</div>
 		</div>
+		</AppShell>
 	);
 }
 
