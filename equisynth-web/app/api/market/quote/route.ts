@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 			throw new Error(`Finnhub API returned ${quoteRes.status}`);
 		}
 
-		const quote = await quoteRes.json();
+			const quote = await quoteRes.json();
 		const profile = await profileRes.json();
 		const metrics = await metricsRes.json();
 
@@ -39,6 +39,15 @@ export async function GET(req: NextRequest) {
 		const change = currentPrice - previousClose;
 		const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0;
 
+		// Try to get volume from quote, if not available try average volume from metrics
+		let volume = quote.v || null;
+		if (!volume || volume === 0) {
+			// Try to get average volume as fallback
+			volume = metrics.metric?.["10DayAverageTradingVolume"] || 
+			         metrics.metric?.avgVol || 
+			         null;
+		}
+
 		return NextResponse.json({
 			symbol: ticker,
 			shortName: profile.name || ticker,
@@ -46,7 +55,7 @@ export async function GET(req: NextRequest) {
 			price: currentPrice,
 			change: change,
 			changePercent: changePercent,
-			volume: quote.v || 0,
+			volume: volume,
 			marketCap: profile.marketCapitalization ? profile.marketCapitalization * 1000000 : null,
 			fiftyTwoWeekHigh: metrics.metric?.["52WeekHigh"] || quote.h,
 			fiftyTwoWeekLow: metrics.metric?.["52WeekLow"] || quote.l,

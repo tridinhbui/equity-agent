@@ -7,6 +7,7 @@ import QuoteHeader from "@/components/agent/QuoteHeader";
 import FactGrid from "@/components/agent/FactGrid";
 import MetricList from "@/components/agent/MetricList";
 import ResultList from "@/components/agent/ResultList";
+import PipelineExplainerCard from "@/components/agent/PipelineExplainerCard";
 
 export default function DashboardPage() {
 	const [ticker, setTicker] = useState("");
@@ -34,8 +35,9 @@ export default function DashboardPage() {
 		setSectionStatus(null);
 		setEmbedStatus(null);
 		setAskResults(null);
+		
 		try {
-			// Fetch filing, quote, and fundamentals in parallel
+			// Step 1: Fetch filing metadata, quote, and fundamentals
 			const [secRes, quoteRes, fundamentalsRes] = await Promise.all([
 				fetch("/api/data/sec", {
 					method: "POST",
@@ -49,35 +51,97 @@ export default function DashboardPage() {
 			const secData = await secRes.json();
 			if (!secRes.ok) throw new Error(secData.error || "Request failed");
 
-			// Add market data to result (gracefully handle failures)
 			const quoteData = quoteRes.ok ? await quoteRes.json() : null;
 			const fundamentalsData = fundamentalsRes.ok ? await fundamentalsRes.json() : null;
 
-			// Try to fetch existing financial metrics if already parsed
-			let financialsData = null;
-			try {
-				const financialsRes = await fetch(
-					`/api/data/financials?ticker=${ticker}&form=${secData.form}&filed=${secData.filed}`
-				);
-				if (financialsRes.ok) {
-					const finData = await financialsRes.json();
-					financialsData = finData.keyMetrics || [];
-				}
-			} catch {
-				// No financials yet, that's ok
-			}
-
+			// Set initial result
 			setResult({
 				...secData,
 				quote: quoteData,
 				fundamentals: fundamentalsData,
-				financials: financialsData,
+				financials: null,
 				company: quoteData?.longName || secData.ticker,
 			});
+
+			// Step 2: Auto-run the pipeline (Download → Section → Embed)
+			await runFullPipeline(secData, ticker);
+
 		} catch (err: any) {
 			setError(err?.message || "Unknown error");
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	// Auto-run the complete pipeline
+	async function runFullPipeline(secData: any, currentTicker: string) {
+		try {
+			// Step 1: Download & Parse
+			setIngestLoading(true);
+			const ingestRes = await fetch("/api/data/ingest", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ 
+					url: secData.url, 
+					ticker: currentTicker, 
+					cik: secData.cik, 
+					form: secData.form, 
+					filed: secData.filed 
+				}),
+			});
+			const ingestData = await ingestRes.json();
+			if (!ingestRes.ok) throw new Error(ingestData.error || "Ingest failed");
+			setIngestStatus(ingestData);
+			setIngestLoading(false);
+
+			// Load financial metrics
+			try {
+				const financialsRes = await fetch(
+					`/api/data/financials?ticker=${currentTicker}&form=${secData.form}&filed=${secData.filed}`
+				);
+				if (financialsRes.ok) {
+					const finData = await financialsRes.json();
+					const metricsArray = finData.keyMetrics ? Object.entries(finData.keyMetrics).map(([key, value]) => ({
+						metric: formatMetricName(key),
+						value: formatMetricValue(key, value),
+						asOf: secData.filed
+					})) : [];
+					setResult((prev: any) => ({ ...prev, financials: metricsArray }));
+				}
+			} catch (err) {
+				console.error("Failed to load financials:", err);
+			}
+
+			// Step 2: Section & Chunk
+			setSectionLoading(true);
+			const sectionRes = await fetch("/api/data/section", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ ticker: currentTicker, form: secData.form, filed: secData.filed }),
+			});
+			const sectionData = await sectionRes.json();
+			if (!sectionRes.ok) throw new Error(sectionData.error || "Sectioning failed");
+			setSectionStatus(sectionData);
+			setSectionLoading(false);
+
+			// Step 3: Generate Embeddings
+			setEmbedLoading(true);
+			const embedRes = await fetch("/api/rag/embed", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ ticker: currentTicker, form: secData.form, filed: secData.filed }),
+			});
+			const embedData = await embedRes.json();
+			if (!embedRes.ok) throw new Error(embedData.error || "Embedding failed");
+			setEmbedStatus(embedData);
+			setEmbedLoading(false);
+
+		} catch (err: any) {
+			console.error("Pipeline error:", err);
+			setError(err?.message || "Pipeline failed");
+			setIngestLoading(false);
+			setSectionLoading(false);
+			setEmbedLoading(false);
 		}
 	}
 
@@ -102,9 +166,18 @@ export default function DashboardPage() {
 				);
 				if (financialsRes.ok) {
 					const finData = await financialsRes.json();
-					setResult((prev: any) => ({ ...prev, financials: finData.keyMetrics || [] }));
+					
+					// Convert keyMetrics object to array format for display
+					const metricsArray = finData.keyMetrics ? Object.entries(finData.keyMetrics).map(([key, value]) => ({
+						metric: formatMetricName(key),
+						value: formatMetricValue(key, value),
+						asOf: result.filed
+					})) : [];
+					
+					setResult((prev: any) => ({ ...prev, financials: metricsArray }));
 				}
-			} catch {
+			} catch (err) {
+				console.error("Failed to load financials:", err);
 				// Ignore if financials not ready yet
 			}
 		} catch (err: any) {
@@ -112,6 +185,70 @@ export default function DashboardPage() {
 		} finally {
 			setIngestLoading(false);
 		}
+	}
+	
+	// Helper function to format metric names
+	function formatMetricName(key: string): string {
+		const nameMap: Record<string, string> = {
+			revenue: "Revenue",
+			grossProfit: "Gross Profit",
+			operatingIncome: "Operating Income",
+			netIncome: "Net Income",
+			eps: "EPS (Diluted)",
+			grossMargin: "Gross Margin",
+			operatingMargin: "Operating Margin",
+			netMargin: "Net Margin",
+			totalAssets: "Total Assets",
+			totalLiabilities: "Total Liabilities",
+			totalEquity: "Total Equity",
+			cash: "Cash & Equivalents",
+			currentAssets: "Current Assets",
+			currentLiabilities: "Current Liabilities",
+			currentRatio: "Current Ratio",
+			debtToEquity: "Debt-to-Equity",
+			equityRatio: "Equity Ratio",
+			roe: "ROE",
+			roa: "ROA",
+			operatingCashFlow: "Operating Cash Flow",
+			investingCashFlow: "Investing Cash Flow",
+			financingCashFlow: "Financing Cash Flow",
+			freeCashFlow: "Free Cash Flow",
+			capex: "CapEx",
+			longTermDebt: "Long-term Debt",
+			shortTermDebt: "Short-term Debt",
+			roic: "ROIC",
+			wacc: "WACC"
+		};
+		return nameMap[key] || key;
+	}
+	
+	// Helper function to format metric values
+	function formatMetricValue(key: string, value: any): string {
+		if (value === null || value === undefined) return "—";
+		
+		const num = Number(value);
+		if (isNaN(num)) return String(value);
+		
+		// Percentages
+		if (key.includes("Margin") || key.includes("Ratio") || key === "roe" || key === "roa" || 
+		    key === "roic" || key === "wacc" || key === "equityRatio") {
+			return `${num.toFixed(2)}%`;
+		}
+		
+		// Large numbers (millions/billions)
+		if (Math.abs(num) >= 1_000_000) {
+			if (Math.abs(num) >= 1_000_000_000) {
+				return `$${(num / 1_000_000_000).toFixed(2)}B`;
+			}
+			return `$${(num / 1_000_000).toFixed(2)}M`;
+		}
+		
+		// Regular numbers
+		return num.toLocaleString('en-US', { 
+			style: 'decimal',
+			minimumFractionDigits: 0,
+			maximumFractionDigits: 2
+		});
 	}
 
 	async function sectionAndChunk() {
@@ -159,14 +296,34 @@ export default function DashboardPage() {
 		setAskLoading(true);
 		setAskResults(null);
 		try {
-			const res = await fetch("/api/rag/query", {
+			// First, get relevant context from RAG
+			const ragRes = await fetch("/api/rag/query", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ ticker, form: result.form, filed: result.filed, query: ask, topK: 5 }),
 			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Query failed");
-			setAskResults(data.results);
+			const ragData = await ragRes.json();
+			if (!ragRes.ok) throw new Error(ragData.error || "Query failed");
+
+			// Then, send to Gemini for natural language response
+			const chatRes = await fetch("/api/chat", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ 
+					question: ask,
+					context: ragData.results,
+					ticker,
+					form: result.form
+				}),
+			});
+			const chatData = await chatRes.json();
+			if (!chatRes.ok) throw new Error(chatData.error || "Chat failed");
+			
+			// Store the AI answer instead of raw results
+			setAskResults([{ 
+				aiAnswer: chatData.answer,
+				sources: chatData.sources 
+			}]);
 		} catch (err: any) {
 			setAskResults([{ error: err?.message || "Unknown error" }]);
 		} finally {
@@ -317,15 +474,17 @@ export default function DashboardPage() {
 											},
 											{ 
 												label: "Volume", 
-												value: result.quote?.volume != null && result.quote.volume > 0
-													? `${(result.quote.volume / 1_000_000).toFixed(2)}M` 
-													: result.quote?.volume === 0 
-														? "0" 
-														: "—"
+												value: (() => {
+													const vol = result.quote?.volume;
+													if (vol == null || vol === 0) return "N/A";
+													return `${(vol / 1_000_000).toFixed(2)}M`;
+												})()
 											},
 										]}
 									/>
-									<div className="text-xs text-gray-500 mt-3">Live market data from Finnhub API</div>
+									<div className="text-xs text-gray-500 mt-3">
+										Live market data from Finnhub API. Volume data depends on API availability.
+									</div>
 								</div>
 
 								{/* Financial Metrics from filing */}
@@ -356,90 +515,81 @@ export default function DashboardPage() {
 										<div className="text-sm text-gray-500">No structured filing metrics yet — run the pipeline to extract sections/chunks.</div>
 									)}
 								</div>
-							</div>
+						</div>
 
-							{/* MIDDLE COLUMN (actions sticky) */}
-							<div className="space-y-6 lg:sticky lg:top-20 h-fit">
-								{/* Pipeline card */}
+						{/* MIDDLE COLUMN (actions sticky) */}
+						<div className="space-y-6 lg:sticky lg:top-20 h-fit">
+							{/* Pipeline Status + Explainer Grid - HIDDEN */}
+							<div className="hidden">
+								<div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+								{/* Auto Pipeline Status (left on xl) */}
 								<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-									<h3 className="text-lg font-semibold mb-4">⚙️ Processing Pipeline</h3>
+									<h3 className="text-lg font-semibold mb-4">⚙️ Processing Status</h3>
 									
 									<p className="text-sm text-gray-600 mb-4">
-										Run these steps in order to extract and analyze the filing:
+										The filing is automatically processed in the background.
 									</p>
 
-									<div className="space-y-3">
-										<button
-											onClick={downloadAndParse}
-											className="w-full px-4 py-3 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-											disabled={ingestLoading}
-										>
-											{ingestLoading ? "📥 Downloading…" : "📥 1) Download & Parse"}
-										</button>
+									{/* Status indicators */}
+									<div className="space-y-2 text-sm">
+										{/* Download status */}
+										<div className={`flex items-center gap-2 p-3 rounded-lg ${
+											ingestStatus?.error ? "bg-red-50 text-red-700" :
+											ingestStatus ? "bg-emerald-50 text-emerald-700" :
+											ingestLoading ? "bg-blue-50 text-blue-700" :
+											"bg-gray-50 text-gray-400"
+										}`}>
+											{ingestLoading ? "🔄" : ingestStatus ? "✅" : "⏳"}
+											<span className="font-medium">Download & Parse</span>
+											{ingestLoading && <span className="ml-auto text-xs">Processing...</span>}
+											{ingestStatus && !ingestStatus.error && <span className="ml-auto text-xs">{ingestStatus.tables} tables</span>}
+										</div>
 
-										<button
-											onClick={sectionAndChunk}
-											className="w-full px-4 py-3 rounded-lg bg-purple-600 text-white font-semibold hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-											disabled={sectionLoading}
-										>
-											{sectionLoading ? "✂️ Processing…" : "✂️ 2) Section & Chunk"}
-										</button>
+										{/* Section status */}
+										<div className={`flex items-center gap-2 p-3 rounded-lg ${
+											sectionStatus?.error ? "bg-red-50 text-red-700" :
+											sectionStatus ? "bg-purple-50 text-purple-700" :
+											sectionLoading ? "bg-blue-50 text-blue-700" :
+											"bg-gray-50 text-gray-400"
+										}`}>
+											{sectionLoading ? "🔄" : sectionStatus ? "✅" : "⏳"}
+											<span className="font-medium">Section & Chunk</span>
+											{sectionLoading && <span className="ml-auto text-xs">Processing...</span>}
+											{sectionStatus && !sectionStatus.error && <span className="ml-auto text-xs">{sectionStatus.chunks} chunks</span>}
+										</div>
 
-										<button
-											onClick={embedChunks}
-											className="w-full px-4 py-3 rounded-lg bg-orange-600 text-white font-semibold hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-											disabled={embedLoading}
-										>
-											{embedLoading ? "🧠 Embedding…" : "🧠 3) Generate Embeddings"}
-										</button>
+										{/* Embed status */}
+										<div className={`flex items-center gap-2 p-3 rounded-lg ${
+											embedStatus?.error ? "bg-red-50 text-red-700" :
+											embedStatus ? "bg-orange-50 text-orange-700" :
+											embedLoading ? "bg-blue-50 text-blue-700" :
+											"bg-gray-50 text-gray-400"
+										}`}>
+											{embedLoading ? "🔄" : embedStatus ? "✅" : "⏳"}
+											<span className="font-medium">Generate Embeddings</span>
+											{embedLoading && <span className="ml-auto text-xs">Processing...</span>}
+											{embedStatus && !embedStatus.error && <span className="ml-auto text-xs">{embedStatus.embedded} embedded</span>}
+										</div>
 									</div>
-
-									{/* Inline status lines */}
-									<div className="mt-4 space-y-2 text-sm">
-										{ingestStatus && (
-											<div className={`${ingestStatus.error ? "text-red-700 bg-red-50" : "text-emerald-800 bg-emerald-50"} border-l-4 ${ingestStatus.error ? "border-red-500" : "border-emerald-500"} rounded-r p-3`}>
-												{ingestStatus.error ? (
-													<div className="font-medium">{ingestStatus.error}</div>
-												) : (
-													<>
-														<div className="font-semibold">✅ Download Complete</div>
-														<div className="text-xs">Saved: <code className="bg-emerald-100 px-1.5 py-0.5 rounded">{ingestStatus.savedDir}</code></div>
-														<div className="text-xs">Stats: {ingestStatus.bytes?.toLocaleString()} bytes · {ingestStatus.textChars?.toLocaleString()} chars · {ingestStatus.tables} tables</div>
-													</>
-												)}
+									
+									{/* Error display */}
+									{(ingestStatus?.error || sectionStatus?.error || embedStatus?.error) && (
+										<div className="mt-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-r">
+											<div className="font-medium text-red-700">Error occurred:</div>
+											<div className="text-sm text-red-600 mt-1">
+												{ingestStatus?.error || sectionStatus?.error || embedStatus?.error}
 											</div>
-										)}
-
-										{sectionStatus && (
-											<div className={`${sectionStatus.error ? "text-red-700 bg-red-50" : "text-purple-800 bg-purple-50"} border-l-4 ${sectionStatus.error ? "border-red-500" : "border-purple-500"} rounded-r p-3`}>
-												{sectionStatus.error ? (
-													<div className="font-medium">{sectionStatus.error}</div>
-												) : (
-													<>
-														<div className="font-semibold">✅ Sectioning Complete</div>
-														<div className="text-xs">📑 {sectionStatus.sections} sections · 📄 {sectionStatus.chunks} chunks</div>
-													</>
-												)}
-											</div>
-										)}
-
-										{embedStatus && (
-											<div className={`${embedStatus.error ? "text-red-700 bg-red-50" : "text-orange-800 bg-orange-50"} border-l-4 ${embedStatus.error ? "border-red-500" : "border-orange-500"} rounded-r p-3`}>
-												{embedStatus.error ? (
-													<div className="font-medium">{embedStatus.error}</div>
-												) : (
-													<>
-														<div className="font-semibold">✅ Embedding Complete</div>
-														<div className="text-xs">🧠 {embedStatus.embedded} chunks {embedStatus.message && `(${embedStatus.message})`} · Total {embedStatus.total}</div>
-													</>
-												)}
-											</div>
-										)}
-									</div>
+										</div>
+									)}
 								</div>
 
-								{/* Ask Questions */}
-								<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+								{/* NEW: Explainer card (right on xl) */}
+								<PipelineExplainerCard />
+								</div>
+							</div>
+
+							{/* Ask Questions */}
+							<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
 									<h3 className="text-lg font-semibold mb-4">💬 Ask Questions</h3>
 									<div className="flex gap-3">
 										<input
