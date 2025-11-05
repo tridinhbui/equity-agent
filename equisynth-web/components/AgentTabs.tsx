@@ -11,6 +11,7 @@ type Tab = {
 
 const AGENT_TABS: Tab[] = [
   { key: "dashboard", label: "Data Extractor", icon: "📊", path: "/dashboard" },
+  { key: "news", label: "Finance News", icon: "📰", path: "/finance-news" },
   { key: "financial", label: "Financial Understanding", icon: "💡", path: "/financial-understanding" },
   { key: "valuation", label: "Valuation", icon: "💰", path: "/valuation" },
   { key: "sentiment", label: "Sentiment & Tone", icon: "🎭", path: "/sentiment" },

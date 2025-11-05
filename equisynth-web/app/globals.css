@@ -17,6 +17,7 @@
 .agent-sunset{ --agent-from:#FFF7ED; --agent-to:#FDE68A; --agent-ring:#F59E0B; }
 .agent-rose  { --agent-from:#FFF1F2; --agent-to:#FFD1DB; --agent-ring:#F43F5E; }
 .agent-indigo{ --agent-from:#EEF2FF; --agent-to:#DDE3FF; --agent-ring:#6366F1; }
+.agent-slate { --agent-from:#E2E8F0; --agent-to:#CBD5E1; --agent-ring:#475569; }
 
 /* Large subtle gradient with your grid still visible behind it */
 .agent-hero {
