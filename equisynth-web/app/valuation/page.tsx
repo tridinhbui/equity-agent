@@ -144,13 +144,23 @@ export default function ValuationPage() {
 			
 			console.log(`📈 Revenue Growth Rate: ${(revenueGrowthRate * 100).toFixed(2)}%`);
 			
-			// Calculate operating margin from metrics
+			// ========================================
+			// METRICS EXTRACTION FROM FINANCIAL UNDERSTANDING AGENT
+			// All metrics below are calculated from the financial statements
+			// to ensure consistency across Data Extractor, Financial Understanding, and Valuation agents
+			// ========================================
+			
+			// Calculate operating margin from actual financial data
 			const operatingMargin = metrics.revenue && metrics.operatingIncome ?
 				metrics.operatingIncome / metrics.revenue : 0.25;
 			
-			// Calculate tax rate
+			console.log(`📊 Operating Margin: ${(operatingMargin * 100).toFixed(2)}% (from ${metrics.operatingIncome?.toLocaleString()}M / ${metrics.revenue?.toLocaleString()}M)`);
+			
+			// Calculate tax rate from actual financial data
 			const taxRate = metrics.netIncome && metrics.operatingIncome ?
 				1 - (metrics.netIncome / metrics.operatingIncome) : 0.21;
+			
+			console.log(`💵 Tax Rate: ${(taxRate * 100).toFixed(2)}% (from Net Income / Operating Income)`);
 			
 			// Calculate actual FCF margin to use as baseline (more accurate than deriving from operating margin)
 			const actualFCF = metrics.freeCashFlow || 
@@ -219,56 +229,31 @@ export default function ValuationPage() {
 			
 			console.log(`💰 Calculated FCF: ${freeCashFlow.toLocaleString()}M (from OCF: ${metrics.operatingCashFlow || 'N/A'}, CapEx: ${capexValue.toLocaleString()}M)`);
 			
-			// Use sector-based WACC estimation (better than ROE-based formula)
-			// Phase 2 will implement proper CAPM with beta and treasury yields
-			function getSectorWACC(ticker: string, marketCap?: number): number {
-				// Large-cap tech companies (typically 8-10% WACC)
-				const largeCapTech = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'NVDA', 'TSLA'];
-				
-				// Mid-cap tech (typically 10-12% WACC)
-				const midCapTech = ['UBER', 'LYFT', 'SNAP', 'PINS'];
-				
+			// Use WACC from Financial Understanding Agent (which calculates it from balance sheet data)
+			// This ensures consistency across Data Extractor, Financial Understanding, and Valuation agents
+			let waccValue: number;
+			
+			if (metrics.wacc && metrics.wacc > 0 && metrics.wacc <= 25) {
+				// Use the calculated WACC from Financial Understanding Agent
+				// Convert from percentage to decimal (e.g., 6.10% -> 0.061)
+				waccValue = metrics.wacc / 100;
+				console.log(`✅ Using calculated WACC from Financial Understanding: ${metrics.wacc.toFixed(2)}% (${waccValue.toFixed(4)} decimal)`);
+			} else {
+				// Fallback to sector-based estimate only if WACC is missing or unreasonable
+				const largeCapTech = ['AAPL', 'MSFT', 'GOOGL', 'META', 'AMZN', 'NVDA'];
 				const tickerUpper = ticker.toUpperCase();
 				
-				// Apple specifically has lower WACC due to strong cash position and low debt
 				if (tickerUpper === 'AAPL') {
-					return 0.085; // 8.5% for Apple (premium company, low risk)
+					waccValue = 0.085; // 8.5% for Apple
+				} else if (largeCapTech.includes(tickerUpper)) {
+					waccValue = 0.09; // 9% for large-cap tech
+				} else if (estimatesData.marketCap && estimatesData.marketCap > 500000) {
+					waccValue = 0.10; // 10% for mega-cap
+				} else {
+					waccValue = 0.11; // 11% default
 				}
 				
-				if (largeCapTech.includes(tickerUpper)) {
-					return 0.09; // 9% for other large-cap tech
-				}
-				
-				if (midCapTech.includes(tickerUpper)) {
-					return 0.11; // 11% for mid-cap tech
-				}
-				
-				// For other companies, use market cap if available
-				if (marketCap) {
-					if (marketCap > 500e6) { // $500B+
-						return 0.10; // Large-cap: 10%
-					} else if (marketCap > 50e6) { // $50B-$500B
-						return 0.12; // Mid-cap: 12%
-					}
-				}
-				
-				// Default for unknown companies
-				return 0.11; // 11% conservative default
-			}
-			
-			// Get sector-based WACC (replaces broken ROE-based calculation)
-			const sectorWACC = getSectorWACC(ticker, estimatesData.marketCap);
-			
-			// Use sector WACC instead of metrics.wacc (which is inflated)
-			// User can override this in Phase 1.5 with editable field
-			let waccValue = sectorWACC;
-			
-			if (metrics.wacc && (metrics.wacc / 100) < 0.15) {
-				// If the calculated WACC is reasonable (<15%), we can consider using it
-				// But for now, stick with sector-based for consistency
-				console.log(`📊 Using sector-based WACC: ${(sectorWACC * 100).toFixed(2)}% (calculated WACC was ${metrics.wacc.toFixed(2)}%)`);
-			} else {
-				console.warn(`⚠️ Calculated WACC of ${metrics.wacc?.toFixed(2)}% is unreliable. Using sector-based: ${(sectorWACC * 100).toFixed(2)}%`);
+				console.warn(`⚠️ WACC not available or unreliable (${metrics.wacc || 'N/A'}%). Using sector-based fallback: ${(waccValue * 100).toFixed(2)}%`);
 			}
 			
 			const inputs: DCFInputs = {
@@ -374,11 +359,11 @@ export default function ValuationPage() {
 
 	return (
 		<AppShell>
-		<div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 p-8">
+		<div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 p-8">
 			<div className="max-w-7xl mx-auto">
 				{/* Header */}
 				<div className="text-center mb-12">
-					<h1 className="text-5xl font-bold text-white mb-4">
+					<h1 className="text-5xl font-bold text-gray-100 mb-4">
 						💰 Valuation Agent
 					</h1>
 					<p className="text-xl text-gray-300">
@@ -387,73 +372,69 @@ export default function ValuationPage() {
 				</div>
 
 				{/* Input Form */}
-				<div className="bg-white/10 backdrop-blur-md rounded-2xl p-8 mb-8">
-					<h2 className="text-2xl font-bold text-white mb-6">Company Selection</h2>
+				<div className="rounded-2xl p-8 mb-8">
+				<h2 className="text-2xl font-bold text-gray-100 mb-6">Company Selection</h2>
+				
+				<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+					<div>
+						<label className="block text-sm font-bold text-gray-100 mb-2">
+							Ticker Symbol
+						</label>
+						<input
+							type="text"
+							value={ticker}
+							onChange={(e) => setTicker(e.target.value.toUpperCase())}
+							className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							placeholder="AAPL"
+						/>
+					</div>
 					
-					<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
-								Ticker Symbol
-							</label>
-							<input
-								type="text"
-								value={ticker}
-								onChange={(e) => setTicker(e.target.value.toUpperCase())}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-								placeholder="AAPL"
-							/>
-						</div>
-						
-						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
-								Form Type
-							</label>
-							<select
-								value={form}
-								onChange={(e) => setForm(e.target.value)}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-							>
-								<option value="10-K">10-K (Annual)</option>
-								<option value="10-Q">10-Q (Quarterly)</option>
-							</select>
-						</div>
-						
-						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
+					<div>
+						<label className="block text-sm font-bold text-gray-100 mb-2">
+							Form Type
+						</label>
+						<select
+							value={form}
+							onChange={(e) => setForm(e.target.value)}
+							className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+						>
+							<option value="10-K">10-K (Annual)</option>
+							<option value="10-Q">10-Q (Quarterly)</option>
+						</select>
+					</div>						<div>
+							<label className="block text-sm font-bold text-gray-100 mb-2">
 								Fiscal Year
 							</label>
 							<input
 								type="number"
 								value={year}
 								onChange={(e) => setYear(parseInt(e.target.value))}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+								className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
 								placeholder="2024"
 							/>
 						</div>
 						
 						<div>
-							<label className="block text-sm font-medium text-gray-300 mb-2">
+							<label className="block text-sm font-bold text-gray-100 mb-2">
 								Filed Date
 							</label>
 							<input
 								type="date"
 								value={filedDate}
 								onChange={(e) => setFiledDate(e.target.value)}
-								className="w-full px-4 py-2 bg-white/20 border border-white/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+								className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
 							/>
 						</div>
-					</div>
-
-					<button
-						onClick={handleRunValuation}
-						disabled={loading}
-						className="w-full px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-pink-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-					>
-						{loading ? '🔄 Calculating DCF...' : '🚀 Run DCF Valuation'}
-					</button>
 				</div>
 
-				{/* Error Display */}
+				<button
+					onClick={handleRunValuation}
+					disabled={loading}
+					className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+				>
+					{loading ? '🔄 Calculating DCF...' : '🚀 Run DCF Valuation'}
+				</button>
+			</div>				{/* Error Display */}
 				{error && (
 					<div className="bg-red-500/20 border border-red-500 rounded-lg p-4 mb-8">
 						<p className="text-red-200">❌ {error}</p>
@@ -464,28 +445,28 @@ export default function ValuationPage() {
 				{dcfResult && dcfInputs && (
 					<div className="space-y-8">
 						{/* Valuation Summary */}
-						<div className="bg-white/10 backdrop-blur-md rounded-2xl p-8">
-							<h2 className="text-3xl font-bold text-white mb-6">
+						<div className="p-8">
+							<h2 className="text-3xl font-bold text-gray-100 mb-6">
 								📊 Valuation Summary
 							</h2>
 							
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-								<div className="bg-white/5 rounded-xl p-6">
-									<p className="text-gray-400 text-sm mb-2">Current Price</p>
-									<p className="text-4xl font-bold text-white">
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+								<div>
+									<p className="text-gray-300 text-sm mb-2">Current Price</p>
+									<p className="text-4xl font-bold text-gray-100">
 										{currentPrice ? `$${currentPrice.toFixed(2)}` : 'N/A'}
 									</p>
 								</div>
 								
-								<div className="bg-white/5 rounded-xl p-6">
-									<p className="text-gray-400 text-sm mb-2">DCF Fair Value</p>
+								<div>
+									<p className="text-gray-300 text-sm mb-2">DCF Fair Value</p>
 									<p className="text-4xl font-bold text-green-400">
 										${dcfResult.fairValuePerShare.toFixed(2)}
 									</p>
 								</div>
 								
-								<div className="bg-white/5 rounded-xl p-6">
-									<p className="text-gray-400 text-sm mb-2">Upside / Downside</p>
+								<div>
+									<p className="text-gray-300 text-sm mb-2">Upside / Downside</p>
 									<p className={`text-4xl font-bold ${dcfResult.upside && dcfResult.upside > 0 ? 'text-green-400' : 'text-red-400'}`}>
 										{dcfResult.upside !== undefined ? `${dcfResult.upside.toFixed(2)}%` : 'N/A'}
 										{dcfResult.upside !== undefined && (dcfResult.upside > 0 ? ' 🚀' : ' 📉')}
@@ -494,24 +475,89 @@ export default function ValuationPage() {
 							</div>
 							
 							{/* Recommendation */}
-							<div className="mt-6 p-4 bg-white/5 rounded-xl">
-								<p className="text-lg text-gray-300 mb-2">
-									<span className="font-semibold text-white">Recommendation:</span>{' '}
+							<div>
+								<p className="text-lg text-gray-300">
+									<span className="font-semibold text-gray-100">Recommendation:</span>{' '}
 									{dcfResult.upside !== undefined && dcfResult.upside > 15 && <span className="text-green-400 font-bold">BUY 🚀</span>}
 									{dcfResult.upside !== undefined && dcfResult.upside >= -15 && dcfResult.upside <= 15 && <span className="text-yellow-400 font-bold">HOLD 📊</span>}
 									{dcfResult.upside !== undefined && dcfResult.upside < -15 && <span className="text-red-400 font-bold">SELL 📉</span>}
-									{dcfResult.upside === undefined && <span className="text-gray-400">N/A</span>}
-								</p>
-								<p className="text-sm text-gray-400">
-									<span className="font-semibold">WACC Used:</span> {formatPercent(dcfInputs.wacc)} 
-									<span className="text-xs ml-2">(sector-based estimation, see WACC_ISSUE_ANALYSIS.md)</span>
-								</p>
+							{dcfResult.upside === undefined && <span className="text-gray-400">N/A</span>}
+						</p>
+						<p className="text-sm text-gray-200 mt-2">
+							<span className="font-bold text-white">WACC Used:</span> {formatPercent(dcfInputs.wacc)}
+						</p>
+					</div>
+				</div>						{/* DCF Assumptions */}
+						<div className="p-8">
+							<h2 className="text-2xl font-bold text-gray-100 mb-6">
+								⚙️ DCF Assumptions & Inputs
+							</h2>
+							<p className="text-gray-300 text-sm mb-4">
+								All metrics synced from Financial Understanding Agent for consistency
+							</p>
+							
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+								{/* Revenue & Growth */}
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Base Revenue (TTM)</p>
+									<p className="text-xl font-bold text-white">${(dcfInputs.revenue / 1000).toFixed(1)}B</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Revenue Growth Rate</p>
+									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.revenueGrowthRate)}</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Terminal Growth Rate</p>
+									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.terminalGrowthRate)}</p>
+								</div>
+								
+								{/* Margins & Rates */}
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Operating Margin</p>
+									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.operatingMargin)}</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Tax Rate</p>
+									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.taxRate)}</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">WACC</p>
+									<p className="text-xl font-bold text-emerald-300">{formatPercent(dcfInputs.wacc)}</p>
+								</div>
+								
+								{/* CapEx & Working Capital */}
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">CapEx (% of Revenue)</p>
+									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.capexAsPercentOfRevenue)}</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">WC Change (% of Rev)</p>
+									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.workingCapitalChangeAsPercentOfRevenue)}</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Shares Outstanding</p>
+									<p className="text-xl font-bold text-white">{(dcfInputs.sharesOutstanding / 1000).toFixed(2)}B</p>
+								</div>
+								
+								{/* Debt & Cash */}
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Total Debt</p>
+									<p className="text-xl font-bold text-white">${(dcfInputs.totalDebt / 1000).toFixed(1)}B</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Cash & Equivalents</p>
+									<p className="text-xl font-bold text-white">${(dcfInputs.cash / 1000).toFixed(1)}B</p>
+								</div>
+								<div>
+									<p className="text-sm font-semibold text-gray-200 mb-1">Net Debt</p>
+									<p className="text-xl font-bold text-white">${((dcfInputs.totalDebt - dcfInputs.cash) / 1000).toFixed(1)}B</p>
+								</div>
 							</div>
 						</div>
 
-						{/* To be continued: DCF Table, Sensitivity Matrix, Assumptions */}
-						<div className="bg-white/10 backdrop-blur-md rounded-2xl p-8">
-							<h2 className="text-2xl font-bold text-white mb-4">
+						{/* To be continued: DCF Table, Sensitivity Matrix */}
+						<div className="rounded-2xl p-8">
+							<h2 className="text-2xl font-bold text-gray-100 mb-4">
 								📈 5-Year Projections
 							</h2>
 							<p className="text-gray-300 mb-4">Coming next: Full projection table, sensitivity analysis, and editable assumptions...</p>

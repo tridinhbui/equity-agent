@@ -613,14 +613,11 @@ export async function GET(req: NextRequest) {
 		const operatingMargin = revenue > 0 && operatingIncome > 0 ? operatingIncome / revenue : 0.25;
 		const taxRate = netIncome > 0 && operatingIncome > 0 ? 1 - (netIncome / operatingIncome) : 0.21;
 		
-		// WACC
-		function getSectorWACC(ticker: string): number {
-			const tickerUpper = ticker.toUpperCase();
-			if (tickerUpper === 'AAPL') return 0.085;
-			if (largeCapTech.includes(tickerUpper)) return 0.09;
-			return 0.11;
+		// WACC - use calculated WACC from Financial Understanding Agent
+		let wacc = 0.085; // Fallback default
+		if (metrics.wacc && metrics.wacc > 0 && metrics.wacc <= 25) {
+			wacc = metrics.wacc / 100; // Convert percentage to decimal (e.g., 6.10 → 0.061)
 		}
-		const wacc = getSectorWACC(ticker);
 		
 		// FCF calculation
 		let capexValue = metrics.capex;
