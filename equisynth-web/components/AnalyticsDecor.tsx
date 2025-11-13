@@ -44,7 +44,14 @@ const MiniBarChart = () => {
 function pctClass(p:number){ return p>=0 ? "pill pill--up" : "pill pill--down"; }
 
 const MarketMoversCard = () => {
-  const ts = new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  const [ts, setTs] = React.useState<string>("");
+
+  React.useEffect(() => {
+    const update = () => {
+      setTs(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    };
+    update();
+  }, []);
   return (
     <>
       <div className="decor__title">Market Movers</div>
@@ -69,7 +76,7 @@ const MarketMoversCard = () => {
           ))}
         </div>
       </div>
-      <div className="mm-foot muted">as of {ts}</div>
+      <div className="mm-foot muted">as of {ts || "--:--"}</div>
     </>
   );
 };

@@ -249,8 +249,15 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 			if (label === "net income" || (label.includes("net income") && !label.includes("per share") && !label.includes("adjustment"))) {
 				metrics.netIncome = latestValue;
 			}
-			if (label.includes("earnings per share") || (label.includes("diluted") && !label.includes("weighted"))) {
-				metrics.eps = latestValue;
+			if (
+				(label.includes("earnings per share") || (label.includes("diluted") && !label.includes("weighted"))) &&
+				!label.includes("shares used")
+			) {
+				if (typeof latestValue === "number" && Math.abs(latestValue) > 1000) {
+					// Likely the row with share counts, skip assigning EPS
+				} else {
+					metrics.eps = latestValue;
+				}
 			}
 		}
 
