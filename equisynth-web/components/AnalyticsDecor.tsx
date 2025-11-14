@@ -172,6 +172,23 @@ const Ticker = () => {
 /* ---------- Layout wrapper with four cards ---------- */
 
 export default function AnalyticsDecor() {
+  // Parallax effect on scroll
+  React.useEffect(() => {
+    const handleScroll = () => {
+      const scrolled = window.scrollY;
+      const cards = document.querySelectorAll('.decor__card');
+      
+      cards.forEach((card, index) => {
+        const speed = 0.1 + (index * 0.05); // Different speeds for each card
+        const yPos = -(scrolled * speed);
+        (card as HTMLElement).style.transform = `translateY(${yPos}px)`;
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <div className="decor" aria-hidden>
       <Glass className="decor__card decor__tl">

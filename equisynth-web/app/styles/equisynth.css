@@ -114,24 +114,132 @@ a:hover{text-decoration:underline}
 .range__labels{display:flex; justify-content:space-between; margin-top:4px; font-size:11px; color:var(--muted)}
 
 /* === Login enhancements === */
-/* Ambient halo */
+/* Professional FinTech ambient halo - Blue & White theme */
 .login-halo {
-  position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-  width:min(1200px,90vw); height:600px; pointer-events:none; z-index:0;
-  background: radial-gradient(ellipse at center,
-    rgba(61,168,240,.20) 0%,
-    rgba(61,168,240,.10) 35%,
-    rgba(61,168,240,.04) 60%,
-    rgba(61,168,240,0) 75%);
-  filter: blur(8px);
+  position: fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+  width:min(1400px,100vw); height:800px; pointer-events:none; z-index:0;
+  background: 
+    radial-gradient(ellipse at center,
+      rgba(59, 168, 240, .16) 0%,      /* Primary blue - trust */
+      rgba(96, 165, 250, .10) 25%,      /* Light blue */
+      rgba(147, 197, 253, .06) 50%,     /* Sky blue */
+      rgba(191, 219, 254, .03) 70%,     /* Very light blue */
+      transparent 85%);
+  filter: blur(16px);
+  animation: haloPulse 12s ease-in-out infinite;
 }
 
-/* Subtle grid */
+@keyframes haloPulse {
+  0%, 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.8; transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* Professional FinTech data grid - Blue & White theme */
 .bg-grid {
-  --c: rgba(15,23,42,.04);
+  --minor: rgba(59, 168, 240, .015);  /* Minor grid lines - subtle blue */
+  --major: rgba(59, 168, 240, .025);  /* Major grid lines - blue */
   background:
-    linear-gradient(var(--c) 1px, transparent 1px) 0 0 / 24px 24px,
-    linear-gradient(90deg, var(--c) 1px, transparent 1px) 0 0 / 24px 24px;
+    /* Major grid lines (every 96px) */
+    linear-gradient(var(--major) 1px, transparent 1px) 0 0 / 96px 96px,
+    linear-gradient(90deg, var(--major) 1px, transparent 1px) 0 0 / 96px 96px,
+    /* Minor grid lines (every 24px) */
+    linear-gradient(var(--minor) 0.5px, transparent 0.5px) 0 0 / 24px 24px,
+    linear-gradient(90deg, var(--minor) 0.5px, transparent 0.5px) 0 0 / 24px 24px;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background-attachment: fixed;
+  background-repeat: repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Professional FinTech animated gradient - Blue & White theme */
+@keyframes gradientShift {
+  0%, 100% {
+    background-position: 0% 0%, 100% 100%, 50% 50%, 25% 75%, 75% 25%;
+  }
+  25% {
+    background-position: 100% 100%, 0% 0%, 50% 50%, 75% 25%, 25% 75%;
+  }
+  50% {
+    background-position: 50% 50%, 50% 50%, 0% 0%, 50% 50%, 50% 50%;
+  }
+  75% {
+    background-position: 75% 25%, 25% 75%, 50% 50%, 0% 0%, 100% 100%;
+  }
+}
+
+.animated-gradient {
+  background: 
+    /* Primary blue - Trust (top-left) */
+    radial-gradient(ellipse at 15% 25%, rgba(59, 168, 240, 0.12) 0%, transparent 45%),
+    /* Light blue (bottom-right) */
+    radial-gradient(ellipse at 85% 75%, rgba(96, 165, 250, 0.08) 0%, transparent 45%),
+    /* Sky blue (center) */
+    radial-gradient(ellipse at 50% 50%, rgba(147, 197, 253, 0.06) 0%, transparent 50%),
+    /* Very light blue (top-right) */
+    radial-gradient(ellipse at 75% 20%, rgba(191, 219, 254, 0.05) 0%, transparent 40%),
+    /* Primary blue (bottom-left) */
+    radial-gradient(ellipse at 25% 80%, rgba(59, 168, 240, 0.07) 0%, transparent 45%);
+  background-size: 280% 280%, 280% 280%, 220% 220%, 300% 300%, 260% 260%;
+  animation: gradientShift 30s ease-in-out infinite;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Floating particles canvas - Blue & White FinTech */
+.floating-particles {
+  opacity: 0.75;
+}
+
+/* Chart lines canvas - Blue & White FinTech */
+.chart-lines {
+  opacity: 0.6;
+}
+
+/* Geometric pattern canvas - Blue & White FinTech */
+.geometric-pattern {
+  opacity: 0.4;
+}
+
+/* FinTech Dot Grid Pattern - Data visualization style */
+.dot-grid-pattern {
+  background-image: radial-gradient(circle, rgba(59, 168, 240, 0.15) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.6;
+}
+
+/* Mesh gradient canvas - Blue & White FinTech */
+.mesh-gradient {
+  opacity: 0.8;
+  mix-blend-mode: multiply;
+}
+
+/* Parallax effect for decor cards */
+.decor__card {
+  transition: transform 0.1s ease-out;
+  will-change: transform;
+}
+
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .login-halo,
+  .animated-gradient,
+  .floating-particles,
+  .chart-lines,
+  .geometric-pattern,
+  .dot-grid-pattern,
+  .mesh-gradient,
+  .decor__card {
+    animation: none !important;
+    transform: none !important;
+  }
 }
 
 /* Feature chips */
