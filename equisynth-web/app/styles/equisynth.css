@@ -145,14 +145,9 @@ a:hover{text-decoration:underline}
     /* Minor grid lines (every 24px) */
     linear-gradient(var(--minor) 0.5px, transparent 0.5px) 0 0 / 24px 24px,
     linear-gradient(90deg, var(--minor) 0.5px, transparent 0.5px) 0 0 / 24px 24px;
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  background-attachment: fixed;
+  background-attachment: local;
   background-repeat: repeat;
-  pointer-events: none;
-  z-index: 0;
+  background-color: transparent;
 }
 
 /* Professional FinTech animated gradient - Blue & White theme */

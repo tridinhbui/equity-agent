@@ -7,7 +7,7 @@ import { FinanceTechBackground } from "@/components/FinanceTechBackground";
 
 export default function Home() {
 	return (
-		<div style={{ position: "relative", width: "100vw", minHeight: "100vh" }}>
+		<div style={{ position: "relative", width: "100%", minHeight: "100vh", overflow: "hidden" }}>
 			{/* Finance Tech Background Component */}
 			<FinanceTechBackground />
 			
