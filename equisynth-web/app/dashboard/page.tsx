@@ -470,14 +470,14 @@ export default function DashboardPage() {
 												label: "P/E Ratio", 
 												value: (() => {
 													const pe = result.quote?.trailingPE || result.fundamentals?.trailingPE;
-													return pe != null ? pe.toFixed(2) : null;
+													return pe != null ? pe.toFixed(3) : null;
 												})()
 											},
 											{ 
 												label: "P/B Ratio", 
 												value: (() => {
 													const pb = result.fundamentals?.priceToBook;
-													return pb != null ? pb.toFixed(2) : null;
+													return pb != null ? pb.toFixed(3) : null;
 												})()
 											},
 											{ 
@@ -490,7 +490,7 @@ export default function DashboardPage() {
 													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
 													// This handles both cases: 0.16405 → 16.405% and 164.05 → 164.05%
 													const percentage = Math.abs(roe) >= 10 ? roe : roe * 100;
-													return `${percentage.toFixed(2)}%`;
+													return `${percentage.toFixed(3)}%`;
 												})()
 											},
 											{ 
@@ -501,14 +501,14 @@ export default function DashboardPage() {
 													// Finnhub typically returns decimal (0.2692 = 26.92%)
 													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
 													const percentage = Math.abs(margin) >= 10 ? margin : margin * 100;
-													return `${percentage.toFixed(2)}%`;
+													return `${percentage.toFixed(3)}%`;
 												})()
 											},
 											{ 
 												label: "Beta", 
 												value: (() => {
 													const beta = result.quote?.beta || result.fundamentals?.beta;
-													return beta != null ? beta.toFixed(2) : null;
+													return beta != null ? beta.toFixed(3) : null;
 												})()
 											},
 											{ 
