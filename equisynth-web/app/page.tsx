@@ -3,18 +3,13 @@
 import { signIn } from "next-auth/react";
 import AppShell from "@/components/AppShell";
 import AnalyticsDecor from "@/components/AnalyticsDecor";
-import { FloatingParticles, AnimatedGradient, ChartLines, GeometricPattern } from "@/components/BackgroundEffects";
+import { FinanceTechBackground } from "@/components/FinanceTechBackground";
 
 export default function Home() {
 	return (
 		<div style={{ position: "relative", width: "100vw", minHeight: "100vh" }}>
-			{/* Background effects - full viewport, fixed position - Blue & White FinTech theme */}
-			<div className="bg-grid" style={{ position: "fixed", inset: 0, zIndex: 0, pointerEvents: "none" }} />
-			<AnimatedGradient />
-			<GeometricPattern />
-			<ChartLines />
-			<FloatingParticles />
-			<div className="login-halo" style={{ position: "fixed" }} />
+			{/* Finance Tech Background Component */}
+			<FinanceTechBackground />
 			
 			{/* AppShell with content */}
 			<AppShell showTabs={false} showHeaderActions={false}>
