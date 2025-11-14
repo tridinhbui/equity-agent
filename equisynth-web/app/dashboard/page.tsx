@@ -229,10 +229,24 @@ export default function DashboardPage() {
 		const num = Number(value);
 		if (isNaN(num)) return String(value);
 		
-		// Percentages
-		if (key.includes("Margin") || key.includes("Ratio") || key === "roe" || key === "roa" || 
-		    key === "roic" || key === "wacc" || key === "equityRatio") {
+		// Percentages (values already multiplied by 100 from parser)
+		const percentageKeys = [
+			"roe", "roa", "roic", "wacc", 
+			"grossMargin", "operatingMargin", "netMargin",
+			"equityRatio"
+		];
+		if (percentageKeys.includes(key) || key.includes("Margin")) {
 			return `${num.toFixed(2)}%`;
+		}
+		
+		// Ratios that are NOT percentages (just numbers)
+		const ratioKeys = ["currentRatio", "debtToEquity"];
+		if (ratioKeys.includes(key)) {
+			return num.toLocaleString('en-US', { 
+				style: 'decimal',
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2
+			});
 		}
 		
 		// Large numbers (millions/billions)
@@ -454,23 +468,48 @@ export default function DashboardPage() {
 										items={[
 											{ 
 												label: "P/E Ratio", 
-												value: result.quote?.trailingPE || result.fundamentals?.trailingPE 
+												value: (() => {
+													const pe = result.quote?.trailingPE || result.fundamentals?.trailingPE;
+													return pe != null ? pe.toFixed(2) : null;
+												})()
 											},
 											{ 
 												label: "P/B Ratio", 
-												value: result.fundamentals?.priceToBook 
+												value: (() => {
+													const pb = result.fundamentals?.priceToBook;
+													return pb != null ? pb.toFixed(2) : null;
+												})()
 											},
 											{ 
 												label: "ROE", 
-												value: result.fundamentals?.returnOnEquity ? `${(result.fundamentals.returnOnEquity * 100).toFixed(2)}%` : null 
+												value: (() => {
+													const roe = result.fundamentals?.returnOnEquity;
+													if (roe == null) return null;
+													// Finnhub typically returns decimal (0.16405 = 16.405%)
+													// But may also return percentage (164.05 = 164.05%)
+													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
+													// This handles both cases: 0.16405 → 16.405% and 164.05 → 164.05%
+													const percentage = Math.abs(roe) >= 10 ? roe : roe * 100;
+													return `${percentage.toFixed(2)}%`;
+												})()
 											},
 											{ 
 												label: "Profit Margin", 
-												value: result.fundamentals?.profitMargins ? `${(result.fundamentals.profitMargins * 100).toFixed(2)}%` : null 
+												value: (() => {
+													const margin = result.fundamentals?.profitMargins;
+													if (margin == null) return null;
+													// Finnhub typically returns decimal (0.2692 = 26.92%)
+													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
+													const percentage = Math.abs(margin) >= 10 ? margin : margin * 100;
+													return `${percentage.toFixed(2)}%`;
+												})()
 											},
 											{ 
 												label: "Beta", 
-												value: result.quote?.beta || result.fundamentals?.beta 
+												value: (() => {
+													const beta = result.quote?.beta || result.fundamentals?.beta;
+													return beta != null ? beta.toFixed(2) : null;
+												})()
 											},
 											{ 
 												label: "Volume", 
