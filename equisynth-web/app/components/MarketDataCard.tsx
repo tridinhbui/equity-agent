@@ -92,8 +92,22 @@ export default function MarketDataCard({ ticker }: MarketDataCardProps) {
 					</p>
 				</div>
 				<div className="text-right text-sm text-gray-600">
-					<p>Volume: {(quote.volume / 1e6).toFixed(2)}M</p>
-					<p>Market Cap: ${(quote.marketCap / 1e9).toFixed(2)}B</p>
+					<p>Volume: {(() => {
+						const vol = quote.volume;
+						if (vol == null || vol === 0) return "N/A";
+						// Format volume consistently: use B for billions, M for millions, K for thousands
+						if (Math.abs(vol) >= 1_000_000_000) {
+							return `${(vol / 1_000_000_000).toFixed(2)}B`;
+						}
+						if (Math.abs(vol) >= 1_000_000) {
+							return `${(vol / 1_000_000).toFixed(2)}M`;
+						}
+						if (Math.abs(vol) >= 1_000) {
+							return `${(vol / 1_000).toFixed(2)}K`;
+						}
+						return vol.toLocaleString();
+					})()}</p>
+					<p>Market Cap: {quote.marketCap ? `$${(quote.marketCap / 1e9).toFixed(2)}B` : "N/A"}</p>
 				</div>
 			</div>
 

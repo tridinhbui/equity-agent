@@ -535,7 +535,17 @@ export default function DashboardPage() {
 												value: (() => {
 													const vol = result.quote?.volume;
 													if (vol == null || vol === 0) return "N/A";
-													return `${(vol / 1_000_000).toFixed(2)}M`;
+													// Format volume consistently: use B for billions, M for millions, K for thousands
+													if (Math.abs(vol) >= 1_000_000_000) {
+														return `${(vol / 1_000_000_000).toFixed(2)}B`;
+													}
+													if (Math.abs(vol) >= 1_000_000) {
+														return `${(vol / 1_000_000).toFixed(2)}M`;
+													}
+													if (Math.abs(vol) >= 1_000) {
+														return `${(vol / 1_000).toFixed(2)}K`;
+													}
+													return vol.toLocaleString();
 												})()
 											},
 										]}

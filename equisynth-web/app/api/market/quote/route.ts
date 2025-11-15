@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
+// Use dynamic import for yahoo-finance2 to avoid bundling issues
+async function getYahooFinance() {
+	const yahooFinance = await import("yahoo-finance2");
+	return yahooFinance.default;
+}
+
 // Use Finnhub API (free tier: 60 calls/minute)
 // Get your free API key at: https://finnhub.io/register
 export async function GET(req: NextRequest) {
@@ -42,10 +48,28 @@ export async function GET(req: NextRequest) {
 		// Try to get volume from quote, if not available try average volume from metrics
 		let volume = quote.v || null;
 		if (!volume || volume === 0) {
-			// Try to get average volume as fallback
+			// Try to get average volume as fallback from Finnhub metrics
 			volume = metrics.metric?.["10DayAverageTradingVolume"] || 
 			         metrics.metric?.avgVol || 
 			         null;
+		}
+
+		// If still no volume, try Yahoo Finance as final fallback
+		if (!volume || volume === 0) {
+			try {
+				const yahooFinance = await getYahooFinance();
+				const yahooQuote = await yahooFinance.quote(ticker);
+				if (yahooQuote?.regularMarketVolume && yahooQuote.regularMarketVolume > 0) {
+					volume = yahooQuote.regularMarketVolume;
+				} else if (yahooQuote?.averageDailyVolume10Day && yahooQuote.averageDailyVolume10Day > 0) {
+					volume = yahooQuote.averageDailyVolume10Day;
+				} else if (yahooQuote?.averageDailyVolume3Month && yahooQuote.averageDailyVolume3Month > 0) {
+					volume = yahooQuote.averageDailyVolume3Month;
+				}
+			} catch (yahooError) {
+				// Silently fail - Yahoo Finance is just a fallback
+				console.log("Yahoo Finance fallback failed:", yahooError);
+			}
 		}
 
 		return NextResponse.json({
