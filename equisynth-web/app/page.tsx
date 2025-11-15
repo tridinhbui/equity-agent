@@ -43,7 +43,7 @@ export default function Home() {
 							<button 
 								className="btn btn-primary" 
 								style={{ width: "100%", marginTop: 20 }}
-								onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+								onClick={() => signIn("google", { callbackUrl: "/main-dashboard" })}
 							>
 								Sign in with Google
 							</button>
