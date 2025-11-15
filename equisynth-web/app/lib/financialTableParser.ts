@@ -93,6 +93,10 @@ function isCashFlowStatement(table: string[][]): boolean {
  * Clean and normalize cell values
  */
 function cleanCellValue(val: string): string | number {
+	if (!val || val.trim() === "" || val === "—" || val === "-") {
+		return null as any; // Return null for empty cells
+	}
+	
 	// First, decode HTML entities
 	let cleaned = val
 		.replace(/&#160;/g, ' ')  // Non-breaking space
@@ -103,12 +107,13 @@ function cleanCellValue(val: string): string | number {
 		.replace(/\s+/g, " ");
 	
 	// Try to parse as number
-	// Common formats: 1,234.56  (1,234)  $1,234  123.45%
-	const numMatch = cleaned.match(/^[\$]?\(?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\)?[\%]?$/);
+	// Common formats: 1,234.56  (1,234)  $1,234  123.45%  -1,234  (1,234.56)
+	// Improved regex to handle more cases
+	const numMatch = cleaned.match(/^[\$]?[\-]?\(?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\)?[\%]?$/);
 	if (numMatch) {
 		const num = parseFloat(numMatch[1].replace(/,/g, ""));
-		// If parentheses, it's negative
-		if (cleaned.includes("(") && cleaned.includes(")")) {
+		// If parentheses OR starts with minus, it's negative
+		if (cleaned.includes("(") && cleaned.includes(")") || cleaned.startsWith("-")) {
 			return -num;
 		}
 		return num;
@@ -224,6 +229,46 @@ export function parseAllFinancialTables(rawTables: string[][][]): FinancialTable
 }
 
 /**
+ * Extract unit scale factor from table headers
+ * SEC filings often indicate units in headers (e.g., "in millions", "in thousands")
+ */
+function extractUnitScale(headers: string[]): number {
+	const headerText = headers.join(" ").toLowerCase();
+	if (headerText.includes("in millions") || headerText.includes("(in millions)")) {
+		return 1_000_000;
+	}
+	if (headerText.includes("in thousands") || headerText.includes("(in thousands)")) {
+		return 1_000;
+	}
+	if (headerText.includes("in billions") || headerText.includes("(in billions)")) {
+		return 1_000_000_000;
+	}
+	// Default: assume values are already in base units (dollars)
+	return 1;
+}
+
+/**
+ * Get the latest (most recent) numeric value from a row
+ * Usually the last non-null numeric value, or first if none found
+ */
+function getLatestNumericValue(values: (string | number)[]): number | null {
+	// Try to find the last numeric value (latest period)
+	for (let i = values.length - 1; i >= 0; i--) {
+		const val = values[i];
+		if (typeof val === 'number' && !isNaN(val) && val !== null) {
+			return val;
+		}
+	}
+	// Fallback: try first numeric value
+	for (const val of values) {
+		if (typeof val === 'number' && !isNaN(val) && val !== null) {
+			return val;
+		}
+	}
+	return null;
+}
+
+/**
  * Extract key metrics from parsed financial tables
  */
 export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any> {
@@ -232,10 +277,17 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	// Income Statement metrics
 	const incomeStatement = tables.find((t) => t.type === "income_statement");
 	if (incomeStatement) {
+		// Extract unit scale from headers
+		const unitScale = extractUnitScale(incomeStatement.headers);
+		
 		for (const row of incomeStatement.rows) {
 			const label = row.label.toLowerCase();
-			// Get the first numeric value (skip $ signs)
-			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			// Get the latest numeric value (most recent period)
+			const latestValueRaw = getLatestNumericValue(row.values);
+			if (latestValueRaw === null) continue;
+			
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
 			
 			if ((label.includes("revenue") || label.includes("net sales")) && label.includes("total")) {
 				metrics.revenue = latestValue;
@@ -253,10 +305,12 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				(label.includes("earnings per share") || (label.includes("diluted") && !label.includes("weighted"))) &&
 				!label.includes("shares used")
 			) {
-				if (typeof latestValue === "number" && Math.abs(latestValue) > 1000) {
+				// EPS is per share, not a total amount, so don't apply unit scale
+				// Use raw value directly (already in dollars per share)
+				if (typeof latestValueRaw === "number" && Math.abs(latestValueRaw) > 1000) {
 					// Likely the row with share counts, skip assigning EPS
 				} else {
-					metrics.eps = latestValue;
+					metrics.eps = latestValueRaw; // EPS is already in dollars per share
 				}
 			}
 		}
@@ -276,6 +330,9 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	// Balance Sheet metrics
 	const balanceSheet = tables.find((t) => t.type === "balance_sheet");
 	if (balanceSheet) {
+		// Extract unit scale from headers
+		const unitScale = extractUnitScale(balanceSheet.headers);
+		
 		for (const row of balanceSheet.rows) {
 			// Clean HTML entities from labels too!
 			let label = row.label
@@ -286,8 +343,12 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				.toLowerCase()
 				.trim();
 			
-			// Get the first numeric value (skip $ signs)
-			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			// Get the latest numeric value (most recent period)
+			const latestValueRaw = getLatestNumericValue(row.values);
+			if (latestValueRaw === null) continue;
+			
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
 			
 			if (label.includes("total assets") && !label.includes("liabilities")) {
 				metrics.totalAssets = latestValue;
@@ -352,6 +413,9 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	}
 	
 	if (cashFlow) {
+		// Extract unit scale from headers
+		const unitScale = extractUnitScale(cashFlow.headers);
+		
 		for (const row of cashFlow.rows) {
 			// Clean HTML entities from label before matching
 			let label = row.label
@@ -362,7 +426,12 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				.toLowerCase()
 				.trim();
 			
-			const latestValue = row.values[0];
+			// Get the latest numeric value (most recent period)
+			const latestValueRaw = getLatestNumericValue(row.values);
+			if (latestValueRaw === null) continue;
+			
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
 			
 			// Match various forms of operating cash flow labels
 			if (label.includes("cash generated by operating") || 
@@ -414,6 +483,8 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 
 	// Extract additional items needed for ROIC and WACC
 	if (balanceSheet) {
+		// Extract unit scale from headers (once, outside loop)
+		const unitScale = extractUnitScale(balanceSheet.headers);
 		let inNonCurrentSection = false;
 		let inCurrentSection = false;
 		
@@ -436,8 +507,12 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				inNonCurrentSection = false;
 			}
 			
-			// Get the first numeric value (skip $ signs)
-			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			// Get the latest numeric value (most recent period)
+			const latestValueRaw = getLatestNumericValue(row.values);
+			if (latestValueRaw === null) continue;
+			
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
 			
 			// For ROIC calculation - look for "Term debt" (Apple's terminology) or traditional labels
 			if (label.includes("long-term debt") || label.includes("long term debt") || 

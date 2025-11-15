@@ -222,7 +222,7 @@ export default function DashboardPage() {
 		return nameMap[key] || key;
 	}
 	
-	// Helper function to format metric values
+	// Helper function to format metric values with appropriate units
 	function formatMetricValue(key: string, value: any): string {
 		if (value === null || value === undefined) return "—";
 		
@@ -236,32 +236,51 @@ export default function DashboardPage() {
 			"equityRatio"
 		];
 		if (percentageKeys.includes(key) || key.includes("Margin")) {
-			return `${num.toFixed(2)}%`;
+			return `${num.toFixed(3)}%`;
 		}
 		
-		// Ratios that are NOT percentages (just numbers)
+		// Ratios that are NOT percentages (just numbers, no unit)
 		const ratioKeys = ["currentRatio", "debtToEquity"];
 		if (ratioKeys.includes(key)) {
 			return num.toLocaleString('en-US', { 
 				style: 'decimal',
-				minimumFractionDigits: 2,
-				maximumFractionDigits: 2
+				minimumFractionDigits: 3,
+				maximumFractionDigits: 3
 			});
 		}
 		
-		// Large numbers (millions/billions)
-		if (Math.abs(num) >= 1_000_000) {
-			if (Math.abs(num) >= 1_000_000_000) {
-				return `$${(num / 1_000_000_000).toFixed(2)}B`;
-			}
-			return `$${(num / 1_000_000).toFixed(2)}M`;
+		// EPS (Earnings Per Share) - in dollars
+		if (key === "eps") {
+			return `$${num.toFixed(2)}`;
 		}
 		
-		// Regular numbers
+		// Financial amounts (revenue, income, assets, liabilities, equity, cash, cash flow, debt, capex)
+		// These should be in $B, $M, or $K
+		const financialAmountKeys = [
+			"revenue", "grossProfit", "operatingIncome", "netIncome",
+			"totalAssets", "totalLiabilities", "totalEquity", "cash",
+			"currentAssets", "currentLiabilities",
+			"operatingCashFlow", "investingCashFlow", "financingCashFlow", "freeCashFlow",
+			"longTermDebt", "shortTermDebt", "capex"
+		];
+		if (financialAmountKeys.includes(key)) {
+			if (Math.abs(num) >= 1_000_000_000) {
+				return `$${(num / 1_000_000_000).toFixed(3)}B`;
+			}
+			if (Math.abs(num) >= 1_000_000) {
+				return `$${(num / 1_000_000).toFixed(3)}M`;
+			}
+			if (Math.abs(num) >= 1_000) {
+				return `$${(num / 1_000).toFixed(3)}K`;
+			}
+			return `$${num.toFixed(2)}`;
+		}
+		
+		// Regular numbers (fallback - should not happen for financial metrics)
 		return num.toLocaleString('en-US', { 
 			style: 'decimal',
 			minimumFractionDigits: 0,
-			maximumFractionDigits: 2
+			maximumFractionDigits: 3
 		});
 	}
 
