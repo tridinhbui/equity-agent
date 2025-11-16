@@ -133,7 +133,10 @@ export function calculateDCF(inputs: DCFInputs, currentPrice?: number): DCFResul
 	const equityValue = enterpriseValue - netDebt;
 	
 	// Fair Value per Share = Equity Value / Shares Outstanding
-	const fairValuePerShare = equityValue / inputs.sharesOutstanding;
+	// Note: sharesOutstanding is in millions, but equityValue is in base dollars
+	// So we need to convert sharesOutstanding to base units (multiply by 1e6)
+	const sharesOutstandingBase = inputs.sharesOutstanding * 1_000_000;
+	const fairValuePerShare = equityValue / sharesOutstandingBase;
 	
 	// Calculate upside/downside if current price provided
 	let upside: number | undefined;

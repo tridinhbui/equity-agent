@@ -11,7 +11,10 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@xenova/transformers": "^2.15.0",
+    "cheerio": "^1.0.0-rc.12",
     "clsx": "^2.1.1",
+    "lucide-react": "^0.553.0",
+    "motion": "^12.23.24",
     "next": "^14.2.33",
     "next-auth": "^4.24.13",
     "onnxruntime-web": "^1.23.0",

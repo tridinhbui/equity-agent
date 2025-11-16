@@ -500,7 +500,7 @@ export default function ValuationPage() {
 								{/* Revenue & Growth */}
 								<div>
 									<p className="text-sm font-semibold text-gray-200 mb-1">Base Revenue (TTM)</p>
-									<p className="text-xl font-bold text-white">${(dcfInputs.revenue / 1000).toFixed(1)}B</p>
+									<p className="text-xl font-bold text-white">${(dcfInputs.revenue / 1_000_000_000).toFixed(1)}B</p>
 								</div>
 								<div>
 									<p className="text-sm font-semibold text-gray-200 mb-1">Revenue Growth Rate</p>
@@ -542,15 +542,15 @@ export default function ValuationPage() {
 								{/* Debt & Cash */}
 								<div>
 									<p className="text-sm font-semibold text-gray-200 mb-1">Total Debt</p>
-									<p className="text-xl font-bold text-white">${(dcfInputs.totalDebt / 1000).toFixed(1)}B</p>
+									<p className="text-xl font-bold text-white">${(dcfInputs.totalDebt / 1_000_000_000).toFixed(1)}B</p>
 								</div>
 								<div>
 									<p className="text-sm font-semibold text-gray-200 mb-1">Cash & Equivalents</p>
-									<p className="text-xl font-bold text-white">${(dcfInputs.cash / 1000).toFixed(1)}B</p>
+									<p className="text-xl font-bold text-white">${(dcfInputs.cash / 1_000_000_000).toFixed(1)}B</p>
 								</div>
 								<div>
 									<p className="text-sm font-semibold text-gray-200 mb-1">Net Debt</p>
-									<p className="text-xl font-bold text-white">${((dcfInputs.totalDebt - dcfInputs.cash) / 1000).toFixed(1)}B</p>
+									<p className="text-xl font-bold text-white">${((dcfInputs.totalDebt - dcfInputs.cash) / 1_000_000_000).toFixed(1)}B</p>
 								</div>
 							</div>
 						</div>

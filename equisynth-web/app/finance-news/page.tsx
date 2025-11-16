@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/AppShell';
 import AgentSurface from '@/components/AgentSurface';
+import NewsTabs from '@/components/NewsTabs';
 
 interface NewsArticle {
 	title: string;
@@ -222,8 +223,13 @@ export default function FinanceNewsPage() {
 	);
 
 	return (
-		<AppShell>
+		<AppShell showTabs={false}>
 			<div className="bg-grid max-w-7xl mx-auto px-4 md:px-6">
+				{/* News Tabs */}
+				<div className="mb-6">
+					<NewsTabs />
+				</div>
+				
 				<div className="agent-slate">
 					<AgentSurface
 						title="📰 Finance News"

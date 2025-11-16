@@ -93,6 +93,10 @@ function isCashFlowStatement(table: string[][]): boolean {
  * Clean and normalize cell values
  */
 function cleanCellValue(val: string): string | number {
+	if (!val || val.trim() === "" || val === "—" || val === "-") {
+		return null as any; // Return null for empty cells
+	}
+	
 	// First, decode HTML entities
 	let cleaned = val
 		.replace(/&#160;/g, ' ')  // Non-breaking space
@@ -103,12 +107,13 @@ function cleanCellValue(val: string): string | number {
 		.replace(/\s+/g, " ");
 	
 	// Try to parse as number
-	// Common formats: 1,234.56  (1,234)  $1,234  123.45%
-	const numMatch = cleaned.match(/^[\$]?\(?(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\)?[\%]?$/);
+	// Common formats: 1,234.56  (1,234)  $1,234  123.45%  -1,234  (1,234.56)  (2935)  2935
+	// Improved regex to handle both comma-separated and non-comma numbers
+	const numMatch = cleaned.match(/^[\$]?[\-]?\(?(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\)?[\%]?$/);
 	if (numMatch) {
 		const num = parseFloat(numMatch[1].replace(/,/g, ""));
-		// If parentheses, it's negative
-		if (cleaned.includes("(") && cleaned.includes(")")) {
+		// If parentheses OR starts with minus, it's negative
+		if (cleaned.includes("(") && cleaned.includes(")") || cleaned.startsWith("-")) {
 			return -num;
 		}
 		return num;
@@ -166,7 +171,14 @@ export function parseFinancialTable(rawTable: string[][]): FinancialTable | null
 		}
 	}
 	
-	const headers = headerRow.map((h) => h.trim());
+	// Build headers: include row 0 if headerRowIndex = 1 (unit indicator might be in row 0)
+	const headers: string[] = [];
+	if (headerRowIndex === 1 && rawTable.length > 0) {
+		// Include row 0 in headers for unit detection
+		const row0 = rawTable[0].map((h) => h.trim());
+		headers.push(...row0);
+	}
+	headers.push(...headerRow.map((h) => h.trim()));
 	const periods = extractPeriods(headerRow);
 
 	// Parse data rows (skip rows up to and including header)
@@ -224,6 +236,112 @@ export function parseAllFinancialTables(rawTables: string[][][]): FinancialTable
 }
 
 /**
+ * Extract unit scale factor from table headers
+ * SEC filings often indicate units in headers (e.g., "in millions", "in thousands")
+ * Also check for variations like "$ in millions", "amounts in millions", etc.
+ */
+function extractUnitScale(headers: string[]): number {
+	const headerText = headers.join(" ").toLowerCase();
+	
+	// Check for millions (most common in SEC filings)
+	if (
+		headerText.includes("in millions") || 
+		headerText.includes("(in millions)") ||
+		headerText.includes("$ in millions") ||
+		headerText.includes("amounts in millions") ||
+		headerText.includes("millions") && (headerText.includes("$") || headerText.includes("amounts"))
+	) {
+		return 1_000_000;
+	}
+	
+	// Check for thousands
+	if (
+		headerText.includes("in thousands") || 
+		headerText.includes("(in thousands)") ||
+		headerText.includes("$ in thousands") ||
+		headerText.includes("amounts in thousands") ||
+		headerText.includes("thousands") && (headerText.includes("$") || headerText.includes("amounts"))
+	) {
+		return 1_000;
+	}
+	
+	// Check for billions
+	if (
+		headerText.includes("in billions") || 
+		headerText.includes("(in billions)") ||
+		headerText.includes("$ in billions") ||
+		headerText.includes("amounts in billions") ||
+		headerText.includes("billions") && (headerText.includes("$") || headerText.includes("amounts"))
+	) {
+		return 1_000_000_000;
+	}
+	
+	// Default: assume values are already in base units (dollars)
+	// NOTE: Most SEC filings use millions, but we can't assume without explicit indicator
+	return 1;
+}
+
+/**
+ * Get the latest (most recent) numeric value from a row
+ * Uses periods array to determine which column is the latest period
+ * In SEC filings, latest period is usually the FIRST column (e.g., 2024, 2023, 2022)
+ */
+function getLatestNumericValue(values: (string | number)[], periods?: string[]): number | null {
+	// If periods are provided, find the latest period and get its value
+	if (periods && periods.length > 0) {
+		// Extract years from periods and find the latest year
+		const years: number[] = [];
+		const periodToIndex = new Map<string, number>();
+		
+		periods.forEach((period, index) => {
+			// Try to extract year from period (e.g., "2024", "September 28, 2024", "2024-09-28")
+			const yearMatch = period.match(/\b(20\d{2})\b/);
+			if (yearMatch) {
+				const year = parseInt(yearMatch[1], 10);
+				years.push(year);
+				periodToIndex.set(period, index);
+			}
+		});
+		
+		if (years.length > 0) {
+			// Find the latest year
+			const latestYear = Math.max(...years);
+			// Find the FIRST period with the latest year (latest period is usually first column in SEC filings)
+			for (let i = 0; i < periods.length; i++) {
+				const period = periods[i];
+				const yearMatch = period.match(/\b(20\d{2})\b/);
+				if (yearMatch && parseInt(yearMatch[1], 10) === latestYear) {
+					// Found the latest period - get value from corresponding column
+					if (i < values.length) {
+						const val = values[i];
+						if (typeof val === 'number' && !isNaN(val) && val !== null) {
+							return val;
+						}
+					}
+					break; // Use first occurrence of latest year
+				}
+			}
+		}
+	}
+	
+	// Fallback: try to find the FIRST numeric value (latest period is usually first column in SEC filings)
+	for (const val of values) {
+		if (typeof val === 'number' && !isNaN(val) && val !== null) {
+			return val;
+		}
+	}
+	
+	// Final fallback: try last numeric value
+	for (let i = values.length - 1; i >= 0; i--) {
+		const val = values[i];
+		if (typeof val === 'number' && !isNaN(val) && val !== null) {
+			return val;
+		}
+	}
+	return null;
+}
+
+/**
  * Extract key metrics from parsed financial tables
  */
 export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any> {
@@ -232,13 +350,58 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	// Income Statement metrics
 	const incomeStatement = tables.find((t) => t.type === "income_statement");
 	if (incomeStatement) {
+		// Extract unit scale from headers (check all header rows for unit indicators)
+		// Sometimes unit indicator is in row 0, sometimes in header row, sometimes in title
+		let unitScale = extractUnitScale(incomeStatement.headers);
+		
+		// Also check table title for unit indicator
+		if (unitScale === 1) {
+			const titleScale = extractUnitScale([incomeStatement.title]);
+			if (titleScale !== 1) {
+				unitScale = titleScale;
+			}
+		}
+		
+		// Fallback: if no unit indicator found and values are large, assume millions
+		// (Most SEC filings use millions for large companies)
+		if (unitScale === 1 && incomeStatement.rows.length > 0) {
+			// Check first few revenue-related rows to estimate scale
+			// Values in 1K-1M range typically indicate millions (e.g., 391,035 = 391 billion)
+			for (const row of incomeStatement.rows.slice(0, 10)) {
+				const latestValue = getLatestNumericValue(row.values, incomeStatement.metadata.periods);
+				if (latestValue !== null && Math.abs(latestValue) >= 1_000 && Math.abs(latestValue) < 1_000_000) {
+					// Values in 1K-1M range suggest they're already in millions
+					unitScale = 1_000_000;
+					break;
+				}
+			}
+		}
+		
 		for (const row of incomeStatement.rows) {
 			const label = row.label.toLowerCase();
-			// Get the first numeric value (skip $ signs)
-			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			// Get the latest numeric value (most recent period)
+			const latestValueRaw = getLatestNumericValue(row.values);
+			if (latestValueRaw === null) continue;
 			
-			if ((label.includes("revenue") || label.includes("net sales")) && label.includes("total")) {
-				metrics.revenue = latestValue;
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
+			
+			// Extract revenue - match various forms: "Total net sales", "Net sales", "Revenue", "Total revenue"
+			// Priority: prefer "total" version if exists, but also accept main revenue line without "total"
+			if (label.includes("revenue") || label.includes("net sales")) {
+				// Skip sub-items like "Product revenue", "Services revenue", "Segment revenue"
+				const isSubItem = label.includes("product") || 
+				                  label.includes("service") || 
+				                  label.includes("segment") ||
+				                  label.includes("geographic") ||
+				                  label.includes("region");
+				
+				if (!isSubItem) {
+					// Prefer "total" version, but accept if not already set
+					if (label.includes("total") || !metrics.revenue) {
+						metrics.revenue = latestValue;
+					}
+				}
 			}
 			if (label.includes("gross profit") || label.includes("gross margin")) {
 				metrics.grossProfit = latestValue;
@@ -249,8 +412,17 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 			if (label === "net income" || (label.includes("net income") && !label.includes("per share") && !label.includes("adjustment"))) {
 				metrics.netIncome = latestValue;
 			}
-			if (label.includes("earnings per share") || (label.includes("diluted") && !label.includes("weighted"))) {
-				metrics.eps = latestValue;
+			if (
+				(label.includes("earnings per share") || (label.includes("diluted") && !label.includes("weighted"))) &&
+				!label.includes("shares used")
+			) {
+				// EPS is per share, not a total amount, so don't apply unit scale
+				// Use raw value directly (already in dollars per share)
+				if (typeof latestValueRaw === "number" && Math.abs(latestValueRaw) > 1000) {
+					// Likely the row with share counts, skip assigning EPS
+				} else {
+					metrics.eps = latestValueRaw; // EPS is already in dollars per share
+				}
 			}
 		}
 
@@ -269,6 +441,29 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	// Balance Sheet metrics
 	const balanceSheet = tables.find((t) => t.type === "balance_sheet");
 	if (balanceSheet) {
+		// Extract unit scale from headers
+		let unitScale = extractUnitScale(balanceSheet.headers);
+		
+		// Also check table title for unit indicator
+		if (unitScale === 1) {
+			const titleScale = extractUnitScale([balanceSheet.title]);
+			if (titleScale !== 1) {
+				unitScale = titleScale;
+			}
+		}
+		
+		// Fallback: if no unit indicator found and values are large, assume millions
+		// Values in 1K-1M range typically indicate millions (e.g., 352,583 = 352 billion)
+		if (unitScale === 1 && balanceSheet.rows.length > 0) {
+			for (const row of balanceSheet.rows.slice(0, 10)) {
+				const latestValue = getLatestNumericValue(row.values, balanceSheet.metadata.periods);
+				if (latestValue !== null && Math.abs(latestValue) >= 1_000 && Math.abs(latestValue) < 1_000_000) {
+					unitScale = 1_000_000;
+					break;
+				}
+			}
+		}
+		
 		for (const row of balanceSheet.rows) {
 			// Clean HTML entities from labels too!
 			let label = row.label
@@ -279,8 +474,12 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				.toLowerCase()
 				.trim();
 			
-			// Get the first numeric value (skip $ signs)
-			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			// Get the latest numeric value (most recent period) using periods metadata
+			const latestValueRaw = getLatestNumericValue(row.values, balanceSheet.metadata.periods);
+			if (latestValueRaw === null) continue;
+			
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
 			
 			if (label.includes("total assets") && !label.includes("liabilities")) {
 				metrics.totalAssets = latestValue;
@@ -345,6 +544,29 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 	}
 	
 	if (cashFlow) {
+		// Extract unit scale from headers
+		let unitScale = extractUnitScale(cashFlow.headers);
+		
+		// Also check table title for unit indicator
+		if (unitScale === 1) {
+			const titleScale = extractUnitScale([cashFlow.title]);
+			if (titleScale !== 1) {
+				unitScale = titleScale;
+			}
+		}
+		
+		// Fallback: if no unit indicator found and values are large, assume millions
+		// Values in 1K-1M range typically indicate millions (e.g., 122,151 = 122 billion)
+		if (unitScale === 1 && cashFlow.rows.length > 0) {
+			for (const row of cashFlow.rows.slice(0, 10)) {
+				const latestValue = getLatestNumericValue(row.values, cashFlow.metadata.periods);
+				if (latestValue !== null && Math.abs(latestValue) >= 1_000 && Math.abs(latestValue) < 1_000_000) {
+					unitScale = 1_000_000;
+					break;
+				}
+			}
+		}
+		
 		for (const row of cashFlow.rows) {
 			// Clean HTML entities from label before matching
 			let label = row.label
@@ -355,7 +577,12 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				.toLowerCase()
 				.trim();
 			
-			const latestValue = row.values[0];
+			// Get the latest numeric value (most recent period) using periods metadata
+			const latestValueRaw = getLatestNumericValue(row.values, cashFlow.metadata.periods);
+			if (latestValueRaw === null) continue;
+			
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
 			
 			// Match various forms of operating cash flow labels
 			if (label.includes("cash generated by operating") || 
@@ -365,13 +592,36 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 			     (label.includes("generated") || label.includes("provided")))) {
 				metrics.operatingCashFlow = latestValue;
 			}
-			if (label.includes("investing activities") || 
-			    label.includes("cash flows from investing")) {
-				metrics.investingCashFlow = latestValue;
+			
+			// Match investing cash flow - look for total line
+			// Patterns: "Cash flows from investing activities", "Net cash used in investing activities", etc.
+			// Skip sub-items like "Purchases of property", "Proceeds from sale", etc.
+			if (label.includes("investing activities") || label.includes("cash flows from investing")) {
+				// Only match if it's the total line (not sub-items)
+				const isSubItem = label.includes("purchases") || 
+				                  label.includes("proceeds") && !label.includes("cash flows") ||
+				                  label.includes("acquisition") ||
+				                  label.includes("sale") && !label.includes("cash flows") ||
+				                  label.includes("maturities");
+				if (!isSubItem) {
+					metrics.investingCashFlow = latestValue;
+				}
 			}
-			if (label.includes("financing activities") ||
-			    label.includes("cash flows from financing")) {
-				metrics.financingCashFlow = latestValue;
+			
+			// Match financing cash flow - look for total line
+			// Patterns: "Cash flows from financing activities", "Net cash used in financing activities", etc.
+			// Skip sub-items like "Proceeds from issuance", "Repayments", etc.
+			if (label.includes("financing activities") || label.includes("cash flows from financing")) {
+				// Only match if it's the total line (not sub-items)
+				const isSubItem = (label.includes("proceeds from") && !label.includes("cash flows")) ||
+				                  label.includes("repayments") ||
+				                  label.includes("issuance") && !label.includes("cash flows") ||
+				                  label.includes("dividends paid") ||
+				                  (label.includes("common stock") && !label.includes("cash flows")) ||
+				                  (label.includes("debt") && !label.includes("cash flows"));
+				if (!isSubItem) {
+					metrics.financingCashFlow = latestValue;
+				}
 			}
 			if (label.includes("free cash flow")) {
 				metrics.freeCashFlow = latestValue;
@@ -407,6 +657,31 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 
 	// Extract additional items needed for ROIC and WACC
 	if (balanceSheet) {
+		// Extract unit scale from headers (with fallback logic)
+		let unitScale = extractUnitScale(balanceSheet.headers);
+		
+		// Also check table title for unit indicator
+		if (unitScale === 1) {
+			const titleScale = extractUnitScale([balanceSheet.title]);
+			if (titleScale !== 1) {
+				unitScale = titleScale;
+			}
+		}
+		
+		// Fallback: if no unit indicator found and values are large, assume millions
+		// Values in 10-1M range typically indicate millions (e.g., 10,912 = 10.912 billion)
+		// But be careful: values < 10 might be actual dollars, not millions
+		if (unitScale === 1 && balanceSheet.rows.length > 0) {
+			for (const row of balanceSheet.rows.slice(0, 10)) {
+				const latestValue = getLatestNumericValue(row.values, balanceSheet.metadata.periods);
+				if (latestValue !== null && Math.abs(latestValue) >= 10 && Math.abs(latestValue) < 1_000_000) {
+					// Only apply if value is significant (>= 10) to avoid false positives
+					unitScale = 1_000_000;
+					break;
+				}
+			}
+		}
+		
 		let inNonCurrentSection = false;
 		let inCurrentSection = false;
 		
@@ -429,8 +704,12 @@ export function extractKeyMetrics(tables: FinancialTable[]): Record<string, any>
 				inNonCurrentSection = false;
 			}
 			
-			// Get the first numeric value (skip $ signs)
-			const latestValue = row.values.find(v => typeof v === 'number') || row.values[0];
+			// Get the latest numeric value (most recent period) using periods metadata
+			const latestValueRaw = getLatestNumericValue(row.values, balanceSheet.metadata.periods);
+			if (latestValueRaw === null) continue;
+			
+			// Apply unit scale (convert to base dollars)
+			const latestValue = latestValueRaw * unitScale;
 			
 			// For ROIC calculation - look for "Term debt" (Apple's terminology) or traditional labels
 			if (label.includes("long-term debt") || label.includes("long term debt") || 

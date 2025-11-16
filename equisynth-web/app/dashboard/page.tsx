@@ -222,32 +222,65 @@ export default function DashboardPage() {
 		return nameMap[key] || key;
 	}
 	
-	// Helper function to format metric values
+	// Helper function to format metric values with appropriate units
 	function formatMetricValue(key: string, value: any): string {
 		if (value === null || value === undefined) return "—";
 		
 		const num = Number(value);
 		if (isNaN(num)) return String(value);
 		
-		// Percentages
-		if (key.includes("Margin") || key.includes("Ratio") || key === "roe" || key === "roa" || 
-		    key === "roic" || key === "wacc" || key === "equityRatio") {
-			return `${num.toFixed(2)}%`;
+		// Percentages (values already multiplied by 100 from parser)
+		const percentageKeys = [
+			"roe", "roa", "roic", "wacc", 
+			"grossMargin", "operatingMargin", "netMargin",
+			"equityRatio"
+		];
+		if (percentageKeys.includes(key) || key.includes("Margin")) {
+			return `${num.toFixed(3)}%`;
 		}
 		
-		// Large numbers (millions/billions)
-		if (Math.abs(num) >= 1_000_000) {
+		// Ratios that are NOT percentages (just numbers, no unit)
+		const ratioKeys = ["currentRatio", "debtToEquity"];
+		if (ratioKeys.includes(key)) {
+			return num.toLocaleString('en-US', { 
+				style: 'decimal',
+				minimumFractionDigits: 3,
+				maximumFractionDigits: 3
+			});
+		}
+		
+		// EPS (Earnings Per Share) - in dollars
+		if (key === "eps") {
+			return `$${num.toFixed(2)}`;
+		}
+		
+		// Financial amounts (revenue, income, assets, liabilities, equity, cash, cash flow, debt, capex)
+		// These should be in $B, $M, or $K
+		const financialAmountKeys = [
+			"revenue", "grossProfit", "operatingIncome", "netIncome",
+			"totalAssets", "totalLiabilities", "totalEquity", "cash",
+			"currentAssets", "currentLiabilities",
+			"operatingCashFlow", "investingCashFlow", "financingCashFlow", "freeCashFlow",
+			"longTermDebt", "shortTermDebt", "capex"
+		];
+		if (financialAmountKeys.includes(key)) {
 			if (Math.abs(num) >= 1_000_000_000) {
-				return `$${(num / 1_000_000_000).toFixed(2)}B`;
+				return `$${(num / 1_000_000_000).toFixed(3)}B`;
 			}
-			return `$${(num / 1_000_000).toFixed(2)}M`;
+			if (Math.abs(num) >= 1_000_000) {
+				return `$${(num / 1_000_000).toFixed(3)}M`;
+			}
+			if (Math.abs(num) >= 1_000) {
+				return `$${(num / 1_000).toFixed(3)}K`;
+			}
+			return `$${num.toFixed(2)}`;
 		}
 		
-		// Regular numbers
+		// Regular numbers (fallback - should not happen for financial metrics)
 		return num.toLocaleString('en-US', { 
 			style: 'decimal',
 			minimumFractionDigits: 0,
-			maximumFractionDigits: 2
+			maximumFractionDigits: 3
 		});
 	}
 
@@ -454,23 +487,48 @@ export default function DashboardPage() {
 										items={[
 											{ 
 												label: "P/E Ratio", 
-												value: result.quote?.trailingPE || result.fundamentals?.trailingPE 
+												value: (() => {
+													const pe = result.quote?.trailingPE || result.fundamentals?.trailingPE;
+													return pe != null ? pe.toFixed(3) : null;
+												})()
 											},
 											{ 
 												label: "P/B Ratio", 
-												value: result.fundamentals?.priceToBook 
+												value: (() => {
+													const pb = result.fundamentals?.priceToBook;
+													return pb != null ? pb.toFixed(3) : null;
+												})()
 											},
 											{ 
 												label: "ROE", 
-												value: result.fundamentals?.returnOnEquity ? `${(result.fundamentals.returnOnEquity * 100).toFixed(2)}%` : null 
+												value: (() => {
+													const roe = result.fundamentals?.returnOnEquity;
+													if (roe == null) return null;
+													// Finnhub typically returns decimal (0.16405 = 16.405%)
+													// But may also return percentage (164.05 = 164.05%)
+													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
+													// This handles both cases: 0.16405 → 16.405% and 164.05 → 164.05%
+													const percentage = Math.abs(roe) >= 10 ? roe : roe * 100;
+													return `${percentage.toFixed(3)}%`;
+												})()
 											},
 											{ 
 												label: "Profit Margin", 
-												value: result.fundamentals?.profitMargins ? `${(result.fundamentals.profitMargins * 100).toFixed(2)}%` : null 
+												value: (() => {
+													const margin = result.fundamentals?.profitMargins;
+													if (margin == null) return null;
+													// Finnhub typically returns decimal (0.2692 = 26.92%)
+													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
+													const percentage = Math.abs(margin) >= 10 ? margin : margin * 100;
+													return `${percentage.toFixed(3)}%`;
+												})()
 											},
 											{ 
 												label: "Beta", 
-												value: result.quote?.beta || result.fundamentals?.beta 
+												value: (() => {
+													const beta = result.quote?.beta || result.fundamentals?.beta;
+													return beta != null ? beta.toFixed(3) : null;
+												})()
 											},
 											{ 
 												label: "Volume", 

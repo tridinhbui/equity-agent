@@ -9,16 +9,12 @@ type Tab = {
   path: string;
 }
 
-const AGENT_TABS: Tab[] = [
-  { key: "dashboard", label: "Data Extractor", icon: "📊", path: "/dashboard" },
-  { key: "financial", label: "Financial Understanding", icon: "💡", path: "/financial-understanding" },
-  { key: "valuation", label: "Valuation", icon: "💰", path: "/valuation" },
-  { key: "sentiment", label: "Sentiment & Tone", icon: "🎭", path: "/sentiment" },
-  { key: "report", label: "Report Composer", icon: "📄", path: "/report" },
-  { key: "supervisor", label: "Supervisor", icon: "🔍", path: "/supervisor" },
+// News tabs - chỉ có Finance News
+const NEWS_TABS: Tab[] = [
+  { key: "finance-news", label: "Finance News", icon: "📰", path: "/finance-news" },
 ];
 
-export default function AgentTabs() {
+export default function NewsTabs() {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -33,7 +29,7 @@ export default function AgentTabs() {
         <span>Back</span>
       </button>
       
-      {AGENT_TABS.map(tab => (
+      {NEWS_TABS.map(tab => (
         <button 
           key={tab.key} 
           className={`tab ${pathname === tab.path ? 'tab--active' : ''}`} 
@@ -46,3 +42,4 @@ export default function AgentTabs() {
     </div>
   );
 }
+
