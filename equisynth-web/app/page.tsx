@@ -1,9 +1,9 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import AppShell from "@/components/AppShell";
 import AnalyticsDecor from "@/components/AnalyticsDecor";
 import { FinanceTechBackground } from "@/components/FinanceTechBackground";
+import { LoginCard } from "@/components/LoginCard";
 
 export default function Home() {
 	return (
@@ -19,39 +19,7 @@ export default function Home() {
 					
 					{/* Login card - z-index: 1 (above all effects) */}
 					<div style={{ display: "grid", placeItems: "center", minHeight: "70vh", position: "relative", zIndex: 1 }}>
-						<div className="card" style={{ maxWidth: 520, position: "relative", zIndex: 1 }}>
-							<h1 style={{ textAlign: "center", marginTop: 4, marginBottom: 8 }}>
-								Welcome to EquiSynth
-							</h1>
-							<p className="muted" style={{ textAlign: "center" }}>
-								Deep Equity Agent automates equity research: reads documents, connects real-time data, analyzes sentiment, and performs valuations to generate traceable reports.
-							</p>
-
-							<ul style={{ marginTop: 12, marginBottom: 16, color: "var(--muted)" }}>
-								<li>• Read 10‑K/10‑Q, transcripts, investor decks</li>
-								<li>• Real-time data: price, fundamentals, macro</li>
-								<li>• Sentiment & Tone: FinBERT & embeddings</li>
-								<li>• Automatic valuation: DCF, EV/EBITDA, multiples</li>
-							</ul>
-
-							<div className="badges">
-								<div className="badge-item">🔒 Read-only OAuth</div>
-								<div className="badge-item">🧾 SEC-first data</div>
-								<div className="badge-item">🗄️ You own your data</div>
-							</div>
-
-							<button 
-								className="btn btn-primary" 
-								style={{ width: "100%", marginTop: 20 }}
-								onClick={() => signIn("google", { callbackUrl: "/main-dashboard" })}
-							>
-								Sign in with Google
-							</button>
-
-							<div className="muted" style={{ marginTop: 10, fontSize: 12, textAlign: "center" }}>
-								By continuing, you agree to EquiSynth's terms of service.
-							</div>
-						</div>
+						<LoginCard />
 					</div>
 
 					{/* Feature chips under the card */}

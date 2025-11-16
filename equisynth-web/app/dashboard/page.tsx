@@ -487,61 +487,78 @@ export default function DashboardPage() {
 										items={[
 											{ 
 												label: "P/E Ratio", 
-												value: (() => {
-													const pe = result.quote?.trailingPE || result.fundamentals?.trailingPE;
-													return pe != null ? pe.toFixed(3) : null;
-												})()
 											},
 											{ 
-												label: "P/B Ratio", 
-												value: (() => {
-													const pb = result.fundamentals?.priceToBook;
-													return pb != null ? pb.toFixed(3) : null;
-												})()
+												label: "P/B Ratio"
 											},
 											{ 
-												label: "ROE", 
-												value: (() => {
-													const roe = result.fundamentals?.returnOnEquity;
-													if (roe == null) return null;
+												label: "ROE"
+											},
+											{ 
+												label: "Profit Margin"
+											},
+											{ 
+												label: "Beta"
+											},
+											{ 
+												label: "Volume"
+											},
+										].map(item => {
+											let value: string | null = null;
+											
+											if (item.label === "P/E Ratio") {
+												const pe = result.quote?.trailingPE || result.fundamentals?.trailingPE;
+												value = pe != null ? pe.toFixed(3) : null;
+											} else if (item.label === "P/B Ratio") {
+												const pb = result.fundamentals?.priceToBook;
+												value = pb != null ? pb.toFixed(3) : null;
+											} else if (item.label === "ROE") {
+												const roe = result.fundamentals?.returnOnEquity;
+												if (roe == null) {
+													value = null;
+												} else {
 													// Finnhub typically returns decimal (0.16405 = 16.405%)
 													// But may also return percentage (164.05 = 164.05%)
 													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
-													// This handles both cases: 0.16405 → 16.405% and 164.05 → 164.05%
 													const percentage = Math.abs(roe) >= 10 ? roe : roe * 100;
-													return `${percentage.toFixed(3)}%`;
-												})()
-											},
-											{ 
-												label: "Profit Margin", 
-												value: (() => {
-													const margin = result.fundamentals?.profitMargins;
-													if (margin == null) return null;
+													value = `${percentage.toFixed(3)}%`;
+												}
+											} else if (item.label === "Profit Margin") {
+												const margin = result.fundamentals?.profitMargins;
+												if (margin == null) {
+													value = null;
+												} else {
 													// Finnhub typically returns decimal (0.2692 = 26.92%)
 													// Use threshold of 10: if >= 10, assume already percentage; if < 10, multiply by 100
 													const percentage = Math.abs(margin) >= 10 ? margin : margin * 100;
-													return `${percentage.toFixed(3)}%`;
-												})()
-											},
-											{ 
-												label: "Beta", 
-												value: (() => {
-													const beta = result.quote?.beta || result.fundamentals?.beta;
-													return beta != null ? beta.toFixed(3) : null;
-												})()
-											},
-											{ 
-												label: "Volume", 
-												value: (() => {
-													const vol = result.quote?.volume;
-													if (vol == null || vol === 0) return "N/A";
-													return `${(vol / 1_000_000).toFixed(2)}M`;
-												})()
-											},
-										]}
+													value = `${percentage.toFixed(3)}%`;
+												}
+											} else if (item.label === "Beta") {
+												const beta = result.quote?.beta || result.fundamentals?.beta;
+												value = beta != null ? beta.toFixed(3) : null;
+											} else if (item.label === "Volume") {
+												const vol = result.quote?.volume;
+												if (vol == null || vol === 0) {
+													value = "N/A";
+												} else {
+													// Format volume with appropriate unit (M for millions, B for billions)
+													if (vol >= 1_000_000_000) {
+														value = `${(vol / 1_000_000_000).toFixed(2)}B`;
+													} else if (vol >= 1_000_000) {
+														value = `${(vol / 1_000_000).toFixed(2)}M`;
+													} else if (vol >= 1_000) {
+														value = `${(vol / 1_000).toFixed(2)}K`;
+													} else {
+														value = vol.toLocaleString();
+													}
+												}
+											}
+											
+											return { ...item, value };
+										})}
 									/>
 									<div className="text-xs text-gray-500 mt-3">
-										Live market data from Finnhub API. Volume data depends on API availability.
+										Live market data from Finnhub API and Yahoo Finance. All metrics are real-time or latest available.
 									</div>
 								</div>
 
