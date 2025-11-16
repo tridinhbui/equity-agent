@@ -92,8 +92,17 @@ export default function MarketDataCard({ ticker }: MarketDataCardProps) {
 					</p>
 				</div>
 				<div className="text-right text-sm text-gray-600">
-					<p>Volume: {(quote.volume / 1e6).toFixed(2)}M</p>
-					<p>Market Cap: ${(quote.marketCap / 1e9).toFixed(2)}B</p>
+					<p>Volume: {(() => {
+						const vol = quote.volume;
+						if (vol == null || vol === 0) return "N/A";
+						if (vol >= 1_000_000_000) return `${(vol / 1_000_000_000).toFixed(2)}B`;
+						if (vol >= 1_000_000) return `${(vol / 1_000_000).toFixed(2)}M`;
+						if (vol >= 1_000) return `${(vol / 1_000).toFixed(2)}K`;
+						return vol.toLocaleString();
+					})()}</p>
+					{quote.marketCap && (
+						<p>Market Cap: ${(quote.marketCap / 1e9).toFixed(2)}B</p>
+					)}
 				</div>
 			</div>
 
@@ -101,44 +110,54 @@ export default function MarketDataCard({ ticker }: MarketDataCardProps) {
 				<div className="border-t pt-3 space-y-2 text-sm">
 					<h4 className="font-medium">Key Metrics</h4>
 					<div className="grid grid-cols-2 gap-2">
-						{fundamentals.trailingPE && (
+						{fundamentals.trailingPE != null && (
 							<div>
 								<span className="text-gray-600">P/E Ratio:</span>{" "}
-								<span className="font-medium">{fundamentals.trailingPE.toFixed(2)}</span>
+								<span className="font-medium">{fundamentals.trailingPE.toFixed(3)}</span>
 							</div>
 						)}
-						{fundamentals.priceToBook && (
+						{fundamentals.priceToBook != null && (
 							<div>
 								<span className="text-gray-600">P/B Ratio:</span>{" "}
-								<span className="font-medium">{fundamentals.priceToBook.toFixed(2)}</span>
+								<span className="font-medium">{fundamentals.priceToBook.toFixed(3)}</span>
 							</div>
 						)}
-						{fundamentals.returnOnEquity && (
+						{fundamentals.returnOnEquity != null && (
 							<div>
 								<span className="text-gray-600">ROE:</span>{" "}
 								<span className="font-medium">
-									{(fundamentals.returnOnEquity * 100).toFixed(2)}%
+									{(() => {
+										const roe = fundamentals.returnOnEquity;
+										// Handle both decimal (0.16405) and percentage (164.05) formats
+										const percentage = Math.abs(roe) >= 10 ? roe : roe * 100;
+										return `${percentage.toFixed(3)}%`;
+									})()}
 								</span>
 							</div>
 						)}
-						{fundamentals.profitMargins && (
+						{fundamentals.profitMargins != null && (
 							<div>
 								<span className="text-gray-600">Profit Margin:</span>{" "}
 								<span className="font-medium">
-									{(fundamentals.profitMargins * 100).toFixed(2)}%
+									{(() => {
+										const margin = fundamentals.profitMargins;
+										// Handle both decimal (0.2692) and percentage (26.92) formats
+										const percentage = Math.abs(margin) >= 10 ? margin : margin * 100;
+										return `${percentage.toFixed(3)}%`;
+									})()}
 								</span>
 							</div>
 						)}
-						{fundamentals.debtToEquity && (
+						{fundamentals.debtToEquity != null && (
 							<div>
 								<span className="text-gray-600">D/E Ratio:</span>{" "}
-								<span className="font-medium">{fundamentals.debtToEquity.toFixed(2)}</span>
+								<span className="font-medium">{fundamentals.debtToEquity.toFixed(3)}</span>
 							</div>
 						)}
-						{fundamentals.beta && (
+						{fundamentals.beta != null && (
 							<div>
 								<span className="text-gray-600">Beta:</span>{" "}
-								<span className="font-medium">{fundamentals.beta.toFixed(2)}</span>
+								<span className="font-medium">{fundamentals.beta.toFixed(3)}</span>
 							</div>
 						)}
 					</div>
