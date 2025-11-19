@@ -19,10 +19,33 @@ export default function FinancialStatementsViewer({
 	const [activeTab, setActiveTab] = useState<
 		"income" | "balance" | "cashflow" | "all"
 	>("all");
+	const [volume, setVolume] = useState<number | null>(null);
 
 	useEffect(() => {
 		loadFinancials();
+		loadVolume();
 	}, [ticker, form, filed]);
+
+	async function loadVolume() {
+		try {
+			const res = await fetch(`/api/market/quote?ticker=${ticker}`);
+			if (res.ok) {
+				const quoteData = await res.json();
+				if (quoteData.volume) {
+					// Check if volume might be already divided (if < 1000 and has decimal, likely already in millions)
+					let volumeNum = quoteData.volume;
+					if (volumeNum > 0.1 && volumeNum < 1000 && volumeNum % 1 !== 0) {
+						// Likely already divided by 1,000,000, so multiply back
+						volumeNum = volumeNum * 1_000_000;
+					}
+					setVolume(volumeNum);
+				}
+			}
+		} catch (err) {
+			// Silently fail - volume is optional
+			console.log("Failed to load volume:", err);
+		}
+	}
 
 	async function loadFinancials() {
 		setLoading(true);
@@ -109,6 +132,21 @@ export default function FinancialStatementsViewer({
 	);
 	const otherTables = data.tables.filter((t: any) => t.type === "other");
 
+	function formatVolume(vol: number | null): string {
+		if (vol == null || vol === 0) return "N/A";
+		// Format volume consistently: use B for billions, M for millions, K for thousands
+		if (Math.abs(vol) >= 1_000_000_000) {
+			return `${(vol / 1_000_000_000).toFixed(2)}B shares`;
+		}
+		if (Math.abs(vol) >= 1_000_000) {
+			return `${(vol / 1_000_000).toFixed(2)}M shares`;
+		}
+		if (Math.abs(vol) >= 1_000) {
+			return `${(vol / 1_000).toFixed(2)}K shares`;
+		}
+		return `${vol.toLocaleString()} shares`;
+	}
+
 	function renderTable(table: any, index: number) {
 		// Skip tables with no data or empty data
 		if (!table.data || !Array.isArray(table.data) || table.data.length === 0) {
@@ -127,6 +165,23 @@ export default function FinancialStatementsViewer({
 					<p className="text-gray-500 text-sm">No data available for this table.</p>
 				</div>
 			);
+		}
+
+		// Prepare table data - add volume row for income statements
+		const tableRows = [...table.data.slice(1)];
+		const isIncomeStatement = table.type === "income_statement";
+		const headerRow = table.data[0] || [];
+		const numColumns = headerRow.length;
+
+		// Add volume row for income statements
+		if (isIncomeStatement && volume != null && volume > 0) {
+			const volumeRow = new Array(numColumns).fill("");
+			volumeRow[0] = "Volume (24h)";
+			// Fill the first data column with volume, leave others empty
+			if (numColumns > 1) {
+				volumeRow[1] = formatVolume(volume);
+			}
+			tableRows.push(volumeRow);
 		}
 
 		return (
@@ -150,7 +205,7 @@ export default function FinancialStatementsViewer({
 					<table className="min-w-full text-sm">
 						<thead>
 							<tr className="bg-gray-200">
-								{table.data[0]?.map((header: string, i: number) => (
+								{headerRow.map((header: string, i: number) => (
 									<th
 										key={i}
 										className="px-4 py-2 text-left font-semibold text-gray-700"
@@ -161,18 +216,21 @@ export default function FinancialStatementsViewer({
 							</tr>
 						</thead>
 						<tbody>
-							{table.data.slice(1).map((row: string[], rowIndex: number) => (
-								<tr
-									key={rowIndex}
-									className={rowIndex % 2 === 0 ? "bg-white" : "bg-gray-100"}
-								>
-									{row?.map((cell: string, cellIndex: number) => (
-										<td key={cellIndex} className="px-4 py-2 text-gray-800">
-											{cell}
-										</td>
-									))}
-								</tr>
-							))}
+							{tableRows.map((row: string[], rowIndex: number) => {
+								const isVolumeRow = isIncomeStatement && rowIndex === tableRows.length - 1 && volume != null && volume > 0;
+								return (
+									<tr
+										key={rowIndex}
+										className={`${rowIndex % 2 === 0 ? "bg-white" : "bg-gray-100"} ${isVolumeRow ? "font-semibold bg-blue-50" : ""}`}
+									>
+										{row?.map((cell: string, cellIndex: number) => (
+											<td key={cellIndex} className={`px-4 py-2 ${isVolumeRow ? "text-blue-700" : "text-gray-800"}`}>
+												{cell}
+											</td>
+										))}
+									</tr>
+								);
+							})}
 						</tbody>
 					</table>
 				</div>

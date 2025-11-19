@@ -19,9 +19,6 @@ export function LoginCard() {
           <h1 className="text-slate-900 mb-4 tracking-tight text-3xl font-bold">
             AI-Powered Equity Research
           </h1>
-          <p className="text-slate-600 max-w-xl mx-auto">
-            Institutional-grade financial analysis combining SEC filings, real-time market data, and proprietary ML models.
-          </p>
         </div>
 
         {/* Key Functions Grid */}

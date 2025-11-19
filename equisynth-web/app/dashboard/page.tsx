@@ -535,17 +535,29 @@ export default function DashboardPage() {
 												value: (() => {
 													const vol = result.quote?.volume;
 													if (vol == null || vol === 0) return "N/A";
+													// Ensure volume is a number
+													let volumeNum = typeof vol === 'number' ? vol : parseFloat(String(vol));
+													if (isNaN(volumeNum) || volumeNum === 0) return "N/A";
+													
+													// Check if volume might be already divided (if < 1000 and has decimal, likely already in millions)
+													// If volume is between 0.1 and 1000 with decimals, assume it's already in millions
+													if (volumeNum > 0.1 && volumeNum < 1000 && volumeNum % 1 !== 0) {
+														// Likely already divided by 1,000,000, so multiply back
+														volumeNum = volumeNum * 1_000_000;
+													}
+													
 													// Format volume consistently: use B for billions, M for millions, K for thousands
-													if (Math.abs(vol) >= 1_000_000_000) {
-														return `${(vol / 1_000_000_000).toFixed(2)}B`;
+													// Always return as string to preserve units
+													if (Math.abs(volumeNum) >= 1_000_000_000) {
+														return `${(volumeNum / 1_000_000_000).toFixed(2)}B shares`;
 													}
-													if (Math.abs(vol) >= 1_000_000) {
-														return `${(vol / 1_000_000).toFixed(2)}M`;
+													if (Math.abs(volumeNum) >= 1_000_000) {
+														return `${(volumeNum / 1_000_000).toFixed(2)}M shares`;
 													}
-													if (Math.abs(vol) >= 1_000) {
-														return `${(vol / 1_000).toFixed(2)}K`;
+													if (Math.abs(volumeNum) >= 1_000) {
+														return `${(volumeNum / 1_000).toFixed(2)}K shares`;
 													}
-													return vol.toLocaleString();
+													return `${volumeNum.toLocaleString()} shares`;
 												})()
 											},
 										]}
