@@ -44,4 +44,5 @@ next-env.d.ts
 .cache/
 
 # local data files
+.data/
 
