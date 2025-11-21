@@ -149,11 +149,47 @@ function createChunks(
 		};
 	}> = [];
 
+	// If no sections found, create chunks from entire text
+	if (sections.length === 0) {
+		console.warn("No sections found, creating chunks from entire text");
+		let start = 0;
+		while (start < text.length) {
+			const end = Math.min(start + chunkSize, text.length);
+			const chunkText = text.substring(start, end).trim();
+
+			if (chunkText.length > 100) {
+				chunks.push({
+					text: chunkText,
+					metadata: {
+						ticker: "", // Will be set by caller
+						form: "", // Will be set by caller
+						filed: "", // Will be set by caller
+						section: "Unknown",
+						char_start: start,
+						char_end: end,
+					},
+				});
+			}
+
+			// Prevent infinite loop: ensure we always advance
+			const nextStart = end - overlap;
+			start = nextStart > start ? nextStart : end;
+			if (start >= text.length) break;
+		}
+		return chunks;
+	}
+
+	// Create chunks from sections
 	for (const section of sections) {
 		const sectionText = text.substring(section.charStart, section.charEnd);
-		let start = 0;
+		if (sectionText.length === 0) continue;
 
-		while (start < sectionText.length) {
+		let start = 0;
+		let iterations = 0;
+		const maxIterations = Math.ceil(sectionText.length / (chunkSize - overlap)) + 10; // Safety limit
+
+		while (start < sectionText.length && iterations < maxIterations) {
+			iterations++;
 			const end = Math.min(start + chunkSize, sectionText.length);
 			const chunkText = sectionText.substring(start, end).trim();
 
@@ -172,7 +208,16 @@ function createChunks(
 				});
 			}
 
-			start = end - overlap; // Overlap for context
+			// Prevent infinite loop: ensure we always advance
+			const nextStart = end - overlap;
+			if (nextStart <= start) {
+				// If overlap would cause us to not advance, move forward by at least chunkSize/2
+				start = start + Math.floor(chunkSize / 2);
+			} else {
+				start = nextStart;
+			}
+			
+			if (start >= sectionText.length) break;
 		}
 	}
 
@@ -206,9 +251,19 @@ export async function POST(req: NextRequest) {
 		}
 
 		const text = await fs.readFile(textPath, "utf-8");
+		
+		if (!text || text.length === 0) {
+			return NextResponse.json(
+				{ error: "Text file is empty. Please run ingest first." },
+				{ status: 400 }
+			);
+		}
+
+		console.log(`Processing filing: ${ticker}, ${form}, ${filed}, text length: ${text.length}`);
 
 		// Identify sections
 		const sections = identifySections(text);
+		console.log(`Found ${sections.length} sections`);
 
 		// Add metadata to sections
 		const sectionsWithMetadata = sections.map((s) => ({
@@ -219,6 +274,7 @@ export async function POST(req: NextRequest) {
 
 		// Create chunks
 		const chunks = createChunks(text, sections, 1000, 200);
+		console.log(`Created ${chunks.length} chunks`);
 
 		// Update section chunk counts
 		for (const chunk of chunks) {
@@ -248,10 +304,14 @@ export async function POST(req: NextRequest) {
 			sections: sectionsWithMetadata,
 		});
 
-		// Save chunks as JSONL
+		// Save chunks as JSONL (even if empty, so we know the process ran)
 		const chunksPath = getFilingPath(ticker, form, filed, "chunks.jsonl");
-		const chunksLines = chunks.map((chunk) => JSON.stringify(chunk)).join("\n");
+		const chunksLines = chunks.length > 0 
+			? chunks.map((chunk) => JSON.stringify(chunk)).join("\n")
+			: "";
 		await fs.writeFile(chunksPath, chunksLines, "utf-8");
+		
+		console.log(`Saved ${chunks.length} chunks to ${chunksPath}`);
 
 		return NextResponse.json({
 			success: true,
@@ -260,6 +320,7 @@ export async function POST(req: NextRequest) {
 			filed,
 			sections: sectionsWithMetadata.length,
 			chunks: chunks.length,
+			warning: chunks.length === 0 ? "No chunks were created. Check if text content is sufficient." : undefined,
 		});
 	} catch (error: any) {
 		console.error("Section error:", error);
