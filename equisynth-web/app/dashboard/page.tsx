@@ -304,19 +304,33 @@ export default function DashboardPage() {
 		}
 	}
 
-	async function embedChunks() {
+	async function embedChunks(embedAll = false) {
 		if (!result?.filed) return;
 		setEmbedLoading(true);
 		setEmbedStatus(null);
 		try {
+			// If embedding all, use a larger maxChunks value
+			const maxChunks = embedAll ? 100 : 5;
 			const res = await fetch("/api/rag/embed", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ ticker, form: result.form, filed: result.filed, batch: 1 }),
+				body: JSON.stringify({ 
+					ticker, 
+					form: result.form, 
+					filed: result.filed, 
+					batch: 1,
+					maxChunks 
+				}),
 			});
 			const data = await res.json();
 			if (!res.ok) throw new Error(data.error || "Embed failed");
 			setEmbedStatus(data);
+			
+			// If not done yet and embedding all, continue embedding
+			if (embedAll && data.total < data.start + maxChunks) {
+				// Continue embedding in batches
+				setTimeout(() => embedChunks(true), 1000);
+			}
 		} catch (err: any) {
 			setEmbedStatus({ error: err?.message || "Unknown error" });
 		} finally {
@@ -330,10 +344,17 @@ export default function DashboardPage() {
 		setAskResults(null);
 		try {
 			// First, get relevant context from RAG
+			// For risk factors questions, use a more specific query and get more chunks
+			const isRiskQuestion = /risk\s+factors?|main\s+risks?|key\s+risks?/i.test(ask);
+			const queryForRAG = isRiskQuestion 
+				? `What are the main risk factors and potential risks for ${ticker}?`
+				: ask;
+			const topK = isRiskQuestion ? 10 : 5; // Get more chunks for risk questions
+			
 			const ragRes = await fetch("/api/rag/query", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ ticker, form: result.form, filed: result.filed, query: ask, topK: 5 }),
+				body: JSON.stringify({ ticker, form: result.form, filed: result.filed, query: queryForRAG, topK }),
 			});
 			const ragData = await ragRes.json();
 			if (!ragRes.ok) throw new Error(ragData.error || "Query failed");
