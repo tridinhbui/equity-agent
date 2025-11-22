@@ -307,7 +307,7 @@ export function FinanceTechBackground() {
       {/* Hologram mini UI - EPS Card */}
       {mounted && (
         <motion.div
-          className="absolute left-[10%] top-[15%] w-40 h-32 border border-blue-500/40 bg-white/60 backdrop-blur-sm rounded-lg p-3 shadow-lg"
+          className="absolute left-[3%] top-[15%] w-40 h-32 border border-blue-500/40 bg-white/60 backdrop-blur-sm rounded-lg p-3 shadow-lg"
           initial={{ opacity: 0, y: 20 }}
           animate={{ 
             opacity: [0.6, 0.85, 0.6],
