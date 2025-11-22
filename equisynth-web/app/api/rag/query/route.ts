@@ -44,13 +44,40 @@ export async function POST(req: NextRequest) {
 				
 				// For risk queries, find chunks with "Item 1A" or "Risk Factors" in text
 				if (isRiskQuery) {
-					// First, find the starting chunk with "Item 1A. Risk Factors"
+					// First, find the starting chunk with "Item 1A. Risk Factors" that contains actual risk content
+					// Skip table of contents references - look for chunks with specific risk content phrases
 					let riskStartIndex = -1;
 					for (let i = 0; i < chunks.length; i++) {
 						const text = (chunks[i].text || "").toLowerCase();
-						if (text.includes("item 1a") && text.includes("risk factors")) {
+						const hasHeader = text.includes("item 1a") && text.includes("risk factors");
+						// Must have specific risk content phrases (not just "risk" keyword which appears in TOC)
+						const hasSpecificRiskContent = text.includes("operations and financial results are subject") ||
+						                               text.includes("various risks and uncertainties") ||
+						                               text.includes("could adversely affect") ||
+						                               (text.includes("adversely affect") && text.includes("business"));
+						
+						if (hasHeader && hasSpecificRiskContent) {
 							riskStartIndex = i;
 							break;
+						}
+					}
+					
+					// Fallback: if we didn't find a header with specific content, look for chunk with both header and substantial risk content
+					if (riskStartIndex === -1) {
+						for (let i = 0; i < chunks.length; i++) {
+							const text = (chunks[i].text || "").toLowerCase();
+							const hasHeader = text.includes("item 1a") && text.includes("risk factors");
+							// Require substantial content with multiple risk-related terms to avoid TOC matches
+							const hasSubstantialRiskContent = text.length > 500 && 
+							                                 (text.includes("adversely affect") || 
+							                                  text.includes("uncertainties") ||
+							                                  text.includes("materially") ||
+							                                  (text.match(/\brisk\b/g) || []).length >= 3); // Multiple "risk" mentions
+							
+							if (hasHeader && hasSubstantialRiskContent) {
+								riskStartIndex = i;
+								break;
+							}
 						}
 					}
 					
@@ -67,8 +94,8 @@ export async function POST(req: NextRequest) {
 							const hasSubstantialContent = text.length > 200;
 							// Not already embedded
 							const notEmbedded = !items.some((item: any) => item.text === chunk.text);
-							// Filter out noise
-							const techIdCount = (text.match(/(us-gaap|aapl|iso4217|xbrli):/gi) || []).length;
+							// Filter out noise (check for various ticker symbols and technical identifiers)
+							const techIdCount = (text.match(/(us-gaap|aapl|msft|iso4217|xbrli):/gi) || []).length;
 							const isNotNoise = techIdCount < 20;
 							// Should contain risk-related keywords
 							const hasRiskKeywords = text.includes("risk") || text.includes("adverse") || 
@@ -125,8 +152,8 @@ export async function POST(req: NextRequest) {
 			const urlCount = (text.match(/https?:\/\//g) || []).length;
 			const xmlTagCount = (text.match(/<[^>]+>/g) || []).length;
 			if (urlCount > 5 || xmlTagCount > 10) return false;
-			// Skip chunks that are mostly technical identifiers (us-gaap:, aapl:, etc.)
-			const techIdCount = (text.match(/(us-gaap|aapl|iso4217|xbrli):/gi) || []).length;
+			// Skip chunks that are mostly technical identifiers (us-gaap:, aapl:, msft:, etc.)
+			const techIdCount = (text.match(/(us-gaap|aapl|msft|iso4217|xbrli):/gi) || []).length;
 			if (techIdCount > 20) return false;
 			return true;
 		});
