@@ -198,41 +198,37 @@ export default function FinancialStatementsViewer({
 			<div className="flex gap-2 mb-6 flex-wrap">
 				<button
 					onClick={() => setActiveTab("all")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all ${
-						activeTab === "all"
-							? "bg-indigo-600 text-white"
-							: "bg-gray-200 text-gray-700 hover:bg-gray-300"
-					}`}
+					className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "all"
+						? "bg-indigo-600 text-white"
+						: "bg-gray-200 text-gray-700 hover:bg-gray-300"
+						}`}
 				>
-					All ({data.tablesCount})
+					All ({incomeStatements.length + balanceSheets.length})
 				</button>
 				<button
 					onClick={() => setActiveTab("income")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all ${
-						activeTab === "income"
+					className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "income"
 							? "bg-indigo-600 text-white"
 							: "bg-gray-200 text-gray-700 hover:bg-gray-300"
-					}`}
+						}`}
 				>
 					📈 Income ({incomeStatements.length})
 				</button>
 				<button
 					onClick={() => setActiveTab("balance")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all ${
-						activeTab === "balance"
-							? "bg-indigo-600 text-white"
-							: "bg-gray-200 text-gray-700 hover:bg-gray-300"
-					}`}
+					className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "balance"
+						? "bg-indigo-600 text-white"
+						: "bg-gray-200 text-gray-700 hover:bg-gray-300"
+						}`}
 				>
 					⚖️ Balance ({balanceSheets.length})
 				</button>
 				<button
 					onClick={() => setActiveTab("cashflow")}
-					className={`px-4 py-2 rounded-lg font-medium transition-all ${
-						activeTab === "cashflow"
-							? "bg-indigo-600 text-white"
-							: "bg-gray-200 text-gray-700 hover:bg-gray-300"
-					}`}
+					className={`px-4 py-2 rounded-lg font-medium transition-all ${activeTab === "cashflow"
+						? "bg-indigo-600 text-white"
+						: "bg-gray-200 text-gray-700 hover:bg-gray-300"
+						}`}
 				>
 					💰 Cash Flow ({cashFlowStatements.length})
 				</button>
@@ -260,24 +256,8 @@ export default function FinancialStatementsViewer({
 								<div className="space-y-4">{balanceSheets.map(renderTable)}</div>
 							</div>
 						)}
-						{cashFlowStatements.length > 0 && (
-							<div>
-								<h3 className="text-xl font-bold text-gray-800 mb-4">
-									💰 Cash Flow Statements
-								</h3>
-								<div className="space-y-4">
-									{cashFlowStatements.map(renderTable)}
-								</div>
-							</div>
-						)}
-						{otherTables.length > 0 && (
-							<div>
-								<h3 className="text-xl font-bold text-gray-800 mb-4">
-									📋 Other Tables
-								</h3>
-								<div className="space-y-4">{otherTables.map(renderTable)}</div>
-							</div>
-						)}
+
+
 					</>
 				)}
 				{activeTab === "income" && (
@@ -293,12 +273,14 @@ export default function FinancialStatementsViewer({
 				)}
 			</div>
 
-			{data.tablesCount === 0 && (
-				<p className="text-center text-gray-500 py-8">
-					No financial tables found in this filing.
-				</p>
-			)}
-		</div>
+			{
+				data.tablesCount === 0 && (
+					<p className="text-center text-gray-500 py-8">
+						No financial tables found in this filing.
+					</p>
+				)
+			}
+		</div >
 	);
 }
 
