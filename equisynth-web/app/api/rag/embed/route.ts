@@ -35,7 +35,14 @@ export async function POST(req: NextRequest) {
 			}
 		}
 		if (start >= items.length) {
-			return new Response(JSON.stringify({ embedded: 0, message: "Nothing to embed (already done)" }), { status: 200 });
+			// All chunks are already embedded, return info about existing embeddings
+			return new Response(JSON.stringify({ 
+				embedded: 0, 
+				total: existing.length,
+				message: existing.length > 0 
+					? `All chunks already embedded (${existing.length} total embeddings)` 
+					: "Nothing to embed (already done)" 
+			}), { status: 200 });
 		}
 
 		const slice = items.slice(start, Math.min(start + maxChunks, items.length));

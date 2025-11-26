@@ -305,19 +305,126 @@ export default function DashboardPage() {
 	}
 
 	async function embedChunks() {
-		if (!result?.filed) return;
+		if (!result?.filed || !ticker) {
+			console.error("Missing required data:", { ticker, filed: result?.filed });
+			setEmbedStatus({ error: "Missing ticker or filing data. Please fetch a filing first." });
+			return;
+		}
 		setEmbedLoading(true);
 		setEmbedStatus(null);
 		try {
-			const res = await fetch("/api/rag/embed", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ ticker, form: result.form, filed: result.filed, batch: 1 }),
-			});
-			const data = await res.json();
-			if (!res.ok) throw new Error(data.error || "Embed failed");
-			setEmbedStatus(data);
+			let totalEmbedded = 0;
+			let totalChunks = 0;
+			let hasMore = true;
+			let iteration = 0;
+			const maxIterations = 100; // Safety limit
+			
+			// Keep embedding until all chunks are processed
+			while (hasMore && iteration < maxIterations) {
+				const res = await fetch("/api/rag/embed", {
+					method: "POST",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify({ 
+						ticker, 
+						form: result.form, 
+						filed: result.filed, 
+						batch: 10, // Process 10 at a time
+						maxChunks: 100, // Process up to 100 chunks per call
+						resume: true // Resume from where we left off
+					}),
+				});
+				
+				const data = await res.json();
+				if (!res.ok) throw new Error(data.error || "Embed failed");
+				
+				totalEmbedded += data.embedded || 0;
+				totalChunks = data.total || totalChunks;
+				
+				// Update status during processing
+				setEmbedStatus({ 
+					embedded: totalEmbedded, 
+					total: totalChunks,
+					message: `Embedding in progress... ${totalEmbedded} chunks embedded`
+				});
+				
+				// If no chunks were embedded in this iteration, we're done
+				if (data.embedded === 0 || data.message?.includes("already done")) {
+					hasMore = false;
+				} else {
+					// Small delay between batches to avoid overwhelming the system
+					await new Promise(resolve => setTimeout(resolve, 100));
+				}
+				
+				iteration++;
+			}
+			
+			// Final status
+			if (totalEmbedded === 0) {
+				// No new chunks were embedded
+				if (totalChunks > 0) {
+					// Embeddings already exist
+					setEmbedStatus({ 
+						embedded: 0, 
+						total: totalChunks,
+						message: `Embeddings already exist (${totalChunks} chunks). Ready to use!`
+					});
+					// Clear the error - embeddings are ready
+					if (askResults && askResults.length > 0 && askResults[0]?.needsEmbedding) {
+						setAskResults(null);
+					}
+				} else {
+					// No embeddings at all - verify if chunks.jsonl exists
+					try {
+						const verifyRes = await fetch("/api/rag/query", {
+							method: "POST",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ 
+								ticker, 
+								form: result.form, 
+								filed: result.filed, 
+								query: "test",
+								topK: 1 
+							}),
+						});
+						
+						if (verifyRes.ok) {
+							// Embeddings exist and work (edge case)
+							setEmbedStatus({ 
+								embedded: 0, 
+								total: 0,
+								message: "Embeddings are ready to use"
+							});
+							if (askResults && askResults.length > 0 && askResults[0]?.needsEmbedding) {
+								setAskResults(null);
+							}
+						} else {
+							// Embeddings don't exist - need chunks.jsonl
+							const verifyData = await verifyRes.json();
+							setEmbedStatus({ 
+								error: `Cannot generate embeddings: ${verifyData.error || "chunks.jsonl not found. Please run 'Parse Sections' first to create chunks."}`
+							});
+						}
+					} catch (verifyErr: any) {
+						setEmbedStatus({ 
+							error: `Cannot generate embeddings. Please ensure chunks.jsonl exists by running 'Parse Sections' first.`
+						});
+					}
+				}
+			} else {
+				// New chunks were embedded successfully
+				setEmbedStatus({ 
+					embedded: totalEmbedded, 
+					total: totalChunks,
+					message: `Successfully embedded ${totalEmbedded} chunks (${totalChunks} total)`
+				});
+				
+				// Clear the error from askResults
+				if (askResults && askResults.length > 0 && askResults[0]?.needsEmbedding) {
+					setAskResults(null);
+				}
+			}
 		} catch (err: any) {
+			console.error("Embed error:", err);
 			setEmbedStatus({ error: err?.message || "Unknown error" });
 		} finally {
 			setEmbedLoading(false);
@@ -336,7 +443,13 @@ export default function DashboardPage() {
 				body: JSON.stringify({ ticker, form: result.form, filed: result.filed, query: ask, topK: 5 }),
 			});
 			const ragData = await ragRes.json();
-			if (!ragRes.ok) throw new Error(ragData.error || "Query failed");
+			if (!ragRes.ok) {
+				// Check if it's the embeddings missing error
+				if (ragData.error && ragData.error.includes("embeddings.json not found")) {
+					throw new Error("EMBEDDINGS_MISSING");
+				}
+				throw new Error(ragData.error || "Query failed");
+			}
 
 			// Then, send to Gemini for natural language response
 			const chatRes = await fetch("/api/chat", {
@@ -358,7 +471,10 @@ export default function DashboardPage() {
 				sources: chatData.sources 
 			}]);
 		} catch (err: any) {
-			setAskResults([{ error: err?.message || "Unknown error" }]);
+			setAskResults([{ 
+				error: err?.message || "Unknown error",
+				needsEmbedding: err?.message === "EMBEDDINGS_MISSING"
+			}]);
 		} finally {
 			setAskLoading(false);
 		}
@@ -688,7 +804,108 @@ export default function DashboardPage() {
 										</button>
 									</div>
 
-									{askResults && (
+									{askResults && askResults.length > 0 && askResults[0]?.needsEmbedding && !embedStatus?.total && !embedStatus?.message?.includes("ready") && (
+										<div className="mt-4 p-4 bg-amber-50 border-2 border-amber-300 rounded-lg">
+											<div className="flex items-start gap-3">
+												<div className="text-amber-600 text-xl">⚠️</div>
+												<div className="flex-1">
+													<p className="text-amber-800 font-semibold mb-2">
+														Embeddings not found
+													</p>
+													<p className="text-amber-700 text-sm mb-3">
+														To ask questions, you need to generate embeddings first. This creates a searchable index of the filing content.
+													</p>
+													<button
+														onClick={(e) => {
+															e.preventDefault();
+															embedChunks();
+														}}
+														disabled={embedLoading || !result?.filed || !ticker}
+														className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+													>
+														{embedLoading ? "🔄 Generating embeddings..." : "🚀 Generate Embeddings"}
+													</button>
+													{!result?.filed && (
+														<p className="text-amber-600 text-xs mt-2">
+															Please fetch a filing first before generating embeddings.
+														</p>
+													)}
+												</div>
+											</div>
+										</div>
+									)}
+
+									{embedStatus && !embedStatus.error && (
+										<div className={`mt-4 p-4 border-2 rounded-lg ${
+											embedLoading 
+												? "bg-blue-50 border-blue-300" 
+												: "bg-green-50 border-green-300"
+										}`}>
+											<div className="flex items-start gap-3">
+												<div className={`text-xl ${embedLoading ? "text-blue-600" : "text-green-600"}`}>
+													{embedLoading ? "🔄" : "✅"}
+												</div>
+												<div className="flex-1">
+													<p className={`font-semibold mb-1 ${
+														embedLoading ? "text-blue-800" : "text-green-800"
+													}`}>
+														{embedLoading 
+															? "Generating embeddings..." 
+															: embedStatus.message?.includes("already exist") || embedStatus.message?.includes("ready")
+																? "Embeddings ready!"
+																: "Embeddings generated successfully!"
+														}
+													</p>
+													<p className={`text-sm ${
+														embedLoading ? "text-blue-700" : "text-green-700"
+													}`}>
+														{embedStatus.message || (
+															<>
+																{embedStatus.embedded ? `Embedded ${embedStatus.embedded} chunks` : ''}
+																{embedStatus.total ? ` (Total: ${embedStatus.total} chunks)` : ''}
+															</>
+														)}
+													</p>
+													{!embedLoading && (
+														<div className="mt-3 flex gap-2">
+															{ask && (
+																<button
+																	onClick={runQuery}
+																	disabled={askLoading}
+																	className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+																>
+																	{askLoading ? "Searching..." : "🔎 Try Your Question Again"}
+																</button>
+															)}
+															{!ask && (
+																<p className="text-green-700 text-sm italic">
+																	You can now ask questions using the search box above.
+																</p>
+															)}
+														</div>
+													)}
+												</div>
+											</div>
+										</div>
+									)}
+
+									{embedStatus?.error && (
+										<div className="mt-4 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+											<div className="flex items-start gap-3">
+												<div className="text-red-600 text-xl">❌</div>
+												<div className="flex-1">
+													<p className="text-red-800 font-semibold mb-1">
+														Failed to generate embeddings
+													</p>
+													<p className="text-red-700 text-sm">
+														{embedStatus.error}
+													</p>
+												</div>
+											</div>
+										</div>
+									)}
+
+									{askResults && askResults.length > 0 && !askResults[0]?.needsEmbedding && (
 										<div className="mt-4">
 											<ResultList results={askResults} />
 										</div>
