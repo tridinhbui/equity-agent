@@ -159,13 +159,7 @@ export default function MainDashboard() {
           <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-indigo-200/20 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3"></div>
 
           <div className="relative z-10 px-8 py-12 lg:py-20 text-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold mb-6 animate-fade-in-up">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-              </span>
-              v2.4 System Online
-            </div>
+
             <h2 className="text-4xl lg:text-6xl font-bold text-slate-900 mb-6 tracking-tight">
               Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#4A90E2] to-[#7BB3FF]">{session?.user?.name || 'User'}</span>
             </h2>
