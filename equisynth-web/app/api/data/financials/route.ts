@@ -141,6 +141,13 @@ export async function GET(req: NextRequest) {
 						const formattedNum = formatNumber(Math.abs(num));
 						formatted.push(`(${formattedNum})`);
 						i = nextNonNull.index + 1; // Skip number, nulls, and ")"
+					}
+					// Check if number is followed by "%"
+					else if (nextNonNull.value === "%") {
+						// Format as number%
+						const formattedNum = formatNumber(Math.abs(num));
+						formatted.push(`${formattedNum}%`);
+						i = nextNonNull.index + 1; // Skip number, nulls, and "%"
 					} else {
 						// Normal format
 						formatted.push(formatNumber(num));
@@ -153,6 +160,12 @@ export async function GET(req: NextRequest) {
 				}
 				// Skip ")" if we've already processed it
 				else if (values[i] === ")") {
+					i += 1;
+				}
+				// Keep "%" as is if it's standalone (not merged with number)
+				// This handles cases like "$", null, "%" where "%" is separate
+				else if (values[i] === "%") {
+					formatted.push("%");
 					i += 1;
 				}
 				// Other values (strings)
