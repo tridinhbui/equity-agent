@@ -10,7 +10,7 @@
 
 The Financial Understanding Agent automatically extracts and analyzes financial data from company SEC filings (10-K, 10-Q), transforming raw financial statements into actionable insights and metrics.
 
-### Core Capabilities:
+### Core Capabilities: 
 
 1. **Financial Statement Parsing**
    - Extracts structured data from Income Statement, Balance Sheet, and Cash Flow Statement
