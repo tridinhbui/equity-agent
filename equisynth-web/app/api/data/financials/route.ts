@@ -255,14 +255,160 @@ export async function GET(req: NextRequest) {
 			return formatted;
 		};
 
+		/**
+		 * Check if a string contains a year (4-digit number like 2024, 2023, etc.)
+		 */
+		const containsYear = (text: string): boolean => {
+			if (!text || !text.trim()) return false;
+			// Check for 4-digit years (1900-2099)
+			return /\b(19|20)\d{2}\b/.test(text);
+		};
+
+		/**
+		 * Format balance sheet headers: headers with years align with value columns
+		 */
+		const formatBalanceSheetHeaders = (
+			headers: string[],
+			allRowValues: (string | number | null)[][]
+		): string[] => {
+			// Find headers that contain years
+			const yearHeaders: { header: string; index: number }[] = [];
+			for (let i = 0; i < headers.length; i++) {
+				if (headers[i] && containsYear(headers[i])) {
+					yearHeaders.push({ header: headers[i].trim(), index: i });
+				}
+			}
+
+			if (yearHeaders.length === 0) {
+				return [];
+			}
+
+			// Find a representative row to determine number of formatted columns
+			let representativeRow: (string | number | null)[] | null = null;
+			for (const rowValues of allRowValues) {
+				if (rowValues && rowValues.length > 0) {
+					const hasData = rowValues.some(
+						(v) =>
+							v !== null &&
+							v !== undefined &&
+							(typeof v === "number" || v === "$" || v !== "")
+					);
+					if (hasData) {
+						representativeRow = rowValues;
+						break;
+					}
+				}
+			}
+
+			if (!representativeRow) {
+				return yearHeaders.map((h) => h.header);
+			}
+
+			// Format the representative row to get the number of columns
+			const formattedRepRow = formatBalanceSheetValues(representativeRow);
+
+			// Map year headers to formatted columns
+			const formattedHeaders: string[] = [];
+			for (let i = 0; i < formattedRepRow.length; i++) {
+				if (i < yearHeaders.length) {
+					formattedHeaders.push(yearHeaders[i].header);
+				} else {
+					formattedHeaders.push("");
+				}
+			}
+
+			return formattedHeaders;
+		};
+
 		// Convert parsed tables to format expected by FinancialStatementsViewer
 		// Component expects: table.data = string[][] (2D array with headers in first row)
 		const tables = tablesData.parsed.map((t) => {
 			// Build 2D array: first row is headers, subsequent rows are data
 			const data: string[][] = [];
 
-			// Add header row
-			data.push(t.headers);
+			// Handle headers differently for balance sheet vs income statement
+			let formattedHeaders: string[] = [];
+			if (t.type === "balance_sheet") {
+				// Balance sheet: headers with years align with value columns
+				const allRowValues: (string | number | null)[][] = [];
+				for (const row of t.rows) {
+					allRowValues.push(row.values);
+				}
+				formattedHeaders = formatBalanceSheetHeaders(
+					t.headers,
+					allRowValues
+				);
+				// Add header row (empty label column + formatted headers)
+				data.push(["", ...formattedHeaders]);
+			} else if (t.type === "income_statement") {
+				// Income statement: 
+				// - Header without year (like "In millions...") → align with label column
+				// - Headers with years (2024, 2023) or "PercentageChange" → align with value columns
+				const allRowValues: (string | number | null)[][] = [];
+				for (const row of t.rows) {
+					allRowValues.push(row.values);
+				}
+				
+				// Find representative row to determine column count
+				let representativeRow: (string | number | null)[] | null = null;
+				for (const rowValues of allRowValues) {
+					if (rowValues && rowValues.length > 0) {
+						const hasData = rowValues.some(
+							(v) =>
+								v !== null &&
+								v !== undefined &&
+								(typeof v === "number" || v === "$" || v !== "")
+						);
+						if (hasData) {
+							representativeRow = rowValues;
+							break;
+						}
+					}
+				}
+				
+				// Find label header (first non-empty header that doesn't contain year and isn't "PercentageChange")
+				let labelHeader = "";
+				for (const header of t.headers) {
+					if (header && header.trim()) {
+						const trimmed = header.trim();
+						if (!containsYear(trimmed) && trimmed !== "PercentageChange") {
+							labelHeader = trimmed;
+							break;
+						}
+					}
+				}
+				
+				// Find value headers (headers with years or "PercentageChange")
+				const valueHeaderIndices: { header: string; index: number }[] = [];
+				for (let i = 0; i < t.headers.length; i++) {
+					if (t.headers[i] && t.headers[i].trim()) {
+						const trimmed = t.headers[i].trim();
+						if (containsYear(trimmed) || trimmed === "PercentageChange") {
+							valueHeaderIndices.push({ header: trimmed, index: i });
+						}
+					}
+				}
+				
+				// Format representative row to get number of value columns
+				let valueHeaders: string[] = [];
+				if (representativeRow) {
+					const formattedRepRow = formatIncomeStatementValues(representativeRow);
+					// Map value headers to formatted columns
+					for (let i = 0; i < formattedRepRow.length; i++) {
+						if (i < valueHeaderIndices.length) {
+							valueHeaders.push(valueHeaderIndices[i].header);
+						} else {
+							valueHeaders.push("");
+						}
+					}
+				}
+				
+				// Label header goes to label column, value headers go to value columns
+				data.push([labelHeader, ...valueHeaders]);
+			} else {
+				// Default: use original headers
+				data.push(t.headers);
+			}
 
 			// Add data rows
 			for (const row of t.rows) {
