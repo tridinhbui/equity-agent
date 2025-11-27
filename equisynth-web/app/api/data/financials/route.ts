@@ -80,6 +80,7 @@ export async function GET(req: NextRequest) {
 		/**
 		 * Special formatting for income statement:
 		 * - Merge "$" with following number (e.g., "$", 294866 -> "$294,866")
+		 * - Handle positive numbers followed by ")" -> wrap in parentheses (e.g., 4738, ")" -> "(4,738)")
 		 * - Group columns with same index together (remove nulls between values)
 		 */
 		const formatIncomeStatementValues = (
@@ -88,17 +89,42 @@ export async function GET(req: NextRequest) {
 			const formatted: string[] = [];
 			let i = 0;
 
+			// Helper function to find next non-null value
+			const findNextNonNull = (startIdx: number): {
+				value: string | number | null;
+				index: number;
+			} => {
+				for (let j = startIdx; j < values.length; j++) {
+					if (values[j] !== null && values[j] !== undefined) {
+						return { value: values[j], index: j };
+					}
+				}
+				return { value: null, index: values.length };
+			};
+
 			while (i < values.length) {
 				// If we encounter "$"
 				if (values[i] === "$") {
-					// Check if next value is a number
+					const nextNonNull = findNextNonNull(i + 1);
+					// Check if next non-null value is a number
 					if (
-						i + 1 < values.length &&
-						typeof values[i + 1] === "number"
+						nextNonNull.value !== null &&
+						typeof nextNonNull.value === "number"
 					) {
-						const num = values[i + 1] as number;
-						formatted.push(`$${formatNumber(num)}`);
-						i += 2; // Skip both "$" and the number
+						const num = nextNonNull.value as number;
+						const afterNum = findNextNonNull(nextNonNull.index + 1);
+						
+						// Check if number is followed by ")"
+						if (afterNum.value === ")") {
+							// Format as (number) with $ prefix
+							const formattedNum = formatNumber(Math.abs(num));
+							formatted.push(`$(${formattedNum})`);
+							i = afterNum.index + 1; // Skip "$", number, nulls, and ")"
+						} else {
+							// Normal format
+							formatted.push(`$${formatNumber(num)}`);
+							i = nextNonNull.index + 1; // Skip "$" and number
+						}
 					} else {
 						formatted.push("$");
 						i += 1;
@@ -106,11 +132,27 @@ export async function GET(req: NextRequest) {
 				}
 				// If we encounter a number (without "$" before it)
 				else if (typeof values[i] === "number") {
-					formatted.push(formatNumber(values[i] as number));
-					i += 1;
+					const num = values[i] as number;
+					const nextNonNull = findNextNonNull(i + 1);
+					
+					// Check if number is followed by ")"
+					if (nextNonNull.value === ")") {
+						// Format as (number)
+						const formattedNum = formatNumber(Math.abs(num));
+						formatted.push(`(${formattedNum})`);
+						i = nextNonNull.index + 1; // Skip number, nulls, and ")"
+					} else {
+						// Normal format
+						formatted.push(formatNumber(num));
+						i += 1;
+					}
 				}
 				// Skip null values
 				else if (values[i] === null || values[i] === undefined) {
+					i += 1;
+				}
+				// Skip ")" if we've already processed it
+				else if (values[i] === ")") {
 					i += 1;
 				}
 				// Other values (strings)
@@ -127,6 +169,7 @@ export async function GET(req: NextRequest) {
 		 * Special formatting for balance sheet:
 		 * - Merge "$" with following number (e.g., "$", 294866 -> "$294,866")
 		 * - Format negative numbers with minus sign (e.g., -1234 -> "-1,234")
+		 * - Handle positive numbers followed by ")" -> wrap in parentheses (e.g., 4738, ")" -> "(4,738)")
 		 * - Group columns with same index together (remove nulls between values)
 		 */
 		const formatBalanceSheetValues = (
@@ -135,19 +178,43 @@ export async function GET(req: NextRequest) {
 			const formatted: string[] = [];
 			let i = 0;
 
+			// Helper function to find next non-null value
+			const findNextNonNull = (startIdx: number): {
+				value: string | number | null;
+				index: number;
+			} => {
+				for (let j = startIdx; j < values.length; j++) {
+					if (values[j] !== null && values[j] !== undefined) {
+						return { value: values[j], index: j };
+					}
+				}
+				return { value: null, index: values.length };
+			};
+
 			while (i < values.length) {
 				// If we encounter "$"
 				if (values[i] === "$") {
-					// Check if next value is a number
+					const nextNonNull = findNextNonNull(i + 1);
+					// Check if next non-null value is a number
 					if (
-						i + 1 < values.length &&
-						typeof values[i + 1] === "number"
+						nextNonNull.value !== null &&
+						typeof nextNonNull.value === "number"
 					) {
-						const num = values[i + 1] as number;
-						// Format number (with parentheses if negative)
-						const formattedNum = formatBalanceSheetNumber(num);
-						formatted.push(`$${formattedNum}`);
-						i += 2; // Skip both "$" and the number
+						const num = nextNonNull.value as number;
+						const afterNum = findNextNonNull(nextNonNull.index + 1);
+						
+						// Check if number is followed by ")"
+						if (afterNum.value === ")") {
+							// Format as (number) with $ prefix
+							const formattedNum = formatNumber(Math.abs(num));
+							formatted.push(`$(${formattedNum})`);
+							i = afterNum.index + 1; // Skip "$", number, nulls, and ")"
+						} else {
+							// Normal format
+							const formattedNum = formatBalanceSheetNumber(num);
+							formatted.push(`$${formattedNum}`);
+							i = nextNonNull.index + 1; // Skip "$" and number
+						}
 					} else {
 						formatted.push("$");
 						i += 1;
@@ -156,11 +223,26 @@ export async function GET(req: NextRequest) {
 				// If we encounter a number (without "$" before it)
 				else if (typeof values[i] === "number") {
 					const num = values[i] as number;
-					formatted.push(formatBalanceSheetNumber(num));
-					i += 1;
+					const nextNonNull = findNextNonNull(i + 1);
+					
+					// Check if number is followed by ")"
+					if (nextNonNull.value === ")") {
+						// Format as (number)
+						const formattedNum = formatNumber(Math.abs(num));
+						formatted.push(`(${formattedNum})`);
+						i = nextNonNull.index + 1; // Skip number, nulls, and ")"
+					} else {
+						// Normal format
+						formatted.push(formatBalanceSheetNumber(num));
+						i += 1;
+					}
 				}
 				// Skip null values
 				else if (values[i] === null || values[i] === undefined) {
+					i += 1;
+				}
+				// Skip ")" if we've already processed it
+				else if (values[i] === ")") {
 					i += 1;
 				}
 				// Other values (strings)
