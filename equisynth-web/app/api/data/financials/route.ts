@@ -52,32 +52,101 @@ export async function GET(req: NextRequest) {
 		// Extract key metrics
 		const keyMetrics = extractKeyMetrics(tablesData.parsed);
 
+		/**
+		 * Format number with thousand separators
+		 */
+		const formatNumber = (num: number): string => {
+			if (Number.isInteger(num)) {
+				return num.toLocaleString("en-US");
+			}
+			return num.toLocaleString("en-US", {
+				minimumFractionDigits: 2,
+				maximumFractionDigits: 2,
+			});
+		};
+
+		/**
+		 * Special formatting for income statement:
+		 * - Merge "$" with following number (e.g., "$", 294866 -> "$294,866")
+		 * - Group columns with same index together (remove nulls between values)
+		 */
+		const formatIncomeStatementValues = (
+			values: (string | number | null)[]
+		): string[] => {
+			const formatted: string[] = [];
+			let i = 0;
+
+			while (i < values.length) {
+				// If we encounter "$"
+				if (values[i] === "$") {
+					// Check if next value is a number
+					if (
+						i + 1 < values.length &&
+						typeof values[i + 1] === "number"
+					) {
+						const num = values[i + 1] as number;
+						formatted.push(`$${formatNumber(num)}`);
+						i += 2; // Skip both "$" and the number
+					} else {
+						formatted.push("$");
+						i += 1;
+					}
+				}
+				// If we encounter a number (without "$" before it)
+				else if (typeof values[i] === "number") {
+					formatted.push(formatNumber(values[i] as number));
+					i += 1;
+				}
+				// Skip null values
+				else if (values[i] === null || values[i] === undefined) {
+					i += 1;
+				}
+				// Other values (strings)
+				else {
+					formatted.push(String(values[i]));
+					i += 1;
+				}
+			}
+
+			return formatted;
+		};
+
 		// Convert parsed tables to format expected by FinancialStatementsViewer
 		// Component expects: table.data = string[][] (2D array with headers in first row)
 		const tables = tablesData.parsed.map((t) => {
 			// Build 2D array: first row is headers, subsequent rows are data
 			const data: string[][] = [];
-			
+
 			// Add header row
 			data.push(t.headers);
-			
+
 			// Add data rows
 			for (const row of t.rows) {
 				const dataRow: string[] = [row.label]; // First column is label
-				// Add values (convert to string, handle null/undefined)
-				for (const value of row.values) {
-					if (value === null || value === undefined) {
-						dataRow.push("");
-					} else if (typeof value === "number") {
-						// Format numbers with thousand separators
-						dataRow.push(value.toLocaleString("en-US"));
-					} else {
-						dataRow.push(String(value));
+
+				// Special formatting for income statement
+				if (t.type === "income_statement") {
+					const formattedValues = formatIncomeStatementValues(
+						row.values
+					);
+					dataRow.push(...formattedValues);
+				} else {
+					// Default formatting for other table types
+					for (const value of row.values) {
+						if (value === null || value === undefined) {
+							dataRow.push("");
+						} else if (typeof value === "number") {
+							// Format numbers with thousand separators
+							dataRow.push(formatNumber(value));
+						} else {
+							dataRow.push(String(value));
+						}
 					}
 				}
+
 				data.push(dataRow);
 			}
-			
+
 			return {
 				type: t.type,
 				title: t.title,
