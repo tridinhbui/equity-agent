@@ -14,12 +14,28 @@ const handler = NextAuth({
 			clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
 		}),
 	],
+	pages: {
+		signIn: "/",
+	},
 	callbacks: {
+		async jwt({ token, user }) {
+			if (user) {
+				token.id = user.id;
+			}
+			return token;
+		},
 		async session({ session, token }) {
 			if (session?.user) {
 				(session.user as any).id = token.sub;
 			}
 			return session;
+		},
+		async redirect({ url, baseUrl }) {
+			// Allow relative callback URLs
+			if (url.startsWith("/")) return `${baseUrl}${url}`;
+			// Allow callback URLs on the same origin
+			if (new URL(url).origin === baseUrl) return url;
+			return baseUrl;
 		},
 	},
 	secret: process.env.NEXTAUTH_SECRET,

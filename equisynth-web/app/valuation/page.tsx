@@ -359,70 +359,70 @@ export default function ValuationPage() {
 
 	return (
 		<AppShell>
-		<div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-900 to-slate-900 p-8">
+		<div className="min-h-screen bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 p-8">
 			<div className="max-w-7xl mx-auto">
 				{/* Header */}
 				<div className="text-center mb-12">
-					<h1 className="text-5xl font-bold text-gray-100 mb-4">
+					<h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">
 						💰 Valuation Agent
 					</h1>
-					<p className="text-xl text-gray-300">
+					<p className="text-xl text-emerald-100 font-medium">
 						DCF (Discounted Cash Flow) Analysis
 					</p>
 				</div>
 
 				{/* Input Form */}
-				<div className="rounded-2xl p-8 mb-8">
-				<h2 className="text-2xl font-bold text-gray-100 mb-6">Company Selection</h2>
+				<div className="rounded-2xl p-8 mb-8 bg-slate-800/60 backdrop-blur-sm border border-emerald-500/20 shadow-2xl">
+				<h2 className="text-2xl font-bold text-white mb-6">Company Selection</h2>
 				
 				<div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
 					<div>
-						<label className="block text-sm font-bold text-gray-100 mb-2">
+						<label className="block text-sm font-semibold text-emerald-100 mb-2">
 							Ticker Symbol
 						</label>
 						<input
 							type="text"
 							value={ticker}
 							onChange={(e) => setTicker(e.target.value.toUpperCase())}
-							className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							className="w-full px-4 py-2.5 bg-slate-700/80 border-2 border-emerald-400/40 rounded-lg text-white placeholder-emerald-200/50 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition-all font-medium"
 							placeholder="AAPL"
 						/>
 					</div>
 					
 					<div>
-						<label className="block text-sm font-bold text-gray-100 mb-2">
+						<label className="block text-sm font-semibold text-emerald-100 mb-2">
 							Form Type
 						</label>
 						<select
 							value={form}
 							onChange={(e) => setForm(e.target.value)}
-							className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+							className="w-full px-4 py-2.5 bg-slate-700/80 border-2 border-emerald-400/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition-all font-medium"
 						>
-							<option value="10-K">10-K (Annual)</option>
-							<option value="10-Q">10-Q (Quarterly)</option>
+							<option value="10-K" className="bg-slate-700">10-K (Annual)</option>
+							<option value="10-Q" className="bg-slate-700">10-Q (Quarterly)</option>
 						</select>
 					</div>						<div>
-							<label className="block text-sm font-bold text-gray-100 mb-2">
+							<label className="block text-sm font-semibold text-emerald-100 mb-2">
 								Fiscal Year
 							</label>
 							<input
 								type="number"
 								value={year}
 								onChange={(e) => setYear(parseInt(e.target.value))}
-								className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+								className="w-full px-4 py-2.5 bg-slate-700/80 border-2 border-emerald-400/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition-all font-medium"
 								placeholder="2024"
 							/>
 						</div>
 						
 						<div>
-							<label className="block text-sm font-bold text-gray-100 mb-2">
+							<label className="block text-sm font-semibold text-emerald-100 mb-2">
 								Filed Date
 							</label>
 							<input
 								type="date"
 								value={filedDate}
 								onChange={(e) => setFiledDate(e.target.value)}
-								className="w-full px-4 py-2 bg-emerald-900/30 border border-emerald-500/30 rounded-lg text-gray-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+								className="w-full px-4 py-2.5 bg-slate-700/80 border-2 border-emerald-400/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 transition-all font-medium"
 							/>
 						</div>
 				</div>
@@ -430,14 +430,14 @@ export default function ValuationPage() {
 				<button
 					onClick={handleRunValuation}
 					disabled={loading}
-					className="w-full px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-lg hover:from-emerald-600 hover:to-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
+					className="w-full px-6 py-4 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold rounded-lg hover:from-emerald-400 hover:to-emerald-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-2xl hover:shadow-emerald-500/50 text-lg border-2 border-emerald-400/30"
 				>
 					{loading ? '🔄 Calculating DCF...' : '🚀 Run DCF Valuation'}
 				</button>
 			</div>				{/* Error Display */}
 				{error && (
-					<div className="bg-red-500/20 border border-red-500 rounded-lg p-4 mb-8">
-						<p className="text-red-200">❌ {error}</p>
+					<div className="bg-red-900/60 border-2 border-red-500/60 rounded-lg p-4 mb-8 backdrop-blur-sm shadow-lg">
+						<p className="text-red-100 font-semibold">❌ {error}</p>
 					</div>
 				)}
 
@@ -445,29 +445,29 @@ export default function ValuationPage() {
 				{dcfResult && dcfInputs && (
 					<div className="space-y-8">
 						{/* Valuation Summary */}
-						<div className="p-8">
-							<h2 className="text-3xl font-bold text-gray-100 mb-6">
+						<div className="p-8 bg-slate-800/60 backdrop-blur-sm border border-emerald-500/20 rounded-2xl shadow-2xl">
+							<h2 className="text-3xl font-bold text-white mb-6">
 								📊 Valuation Summary
 							</h2>
 							
 							<div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-								<div>
-									<p className="text-gray-300 text-sm mb-2">Current Price</p>
-									<p className="text-4xl font-bold text-gray-100">
+								<div className="bg-slate-700/50 p-6 rounded-xl border border-slate-600/50">
+									<p className="text-emerald-200 text-sm font-semibold mb-3 uppercase tracking-wide">Current Price</p>
+									<p className="text-4xl font-bold text-white">
 										{currentPrice ? `$${currentPrice.toFixed(2)}` : 'N/A'}
 									</p>
 								</div>
 								
-								<div>
-									<p className="text-gray-300 text-sm mb-2">DCF Fair Value</p>
-									<p className="text-4xl font-bold text-green-400">
+								<div className="bg-emerald-900/30 p-6 rounded-xl border-2 border-emerald-400/40">
+									<p className="text-emerald-100 text-sm font-semibold mb-3 uppercase tracking-wide">DCF Fair Value</p>
+									<p className="text-4xl font-bold text-emerald-300 drop-shadow-lg">
 										${dcfResult.fairValuePerShare.toFixed(2)}
 									</p>
 								</div>
 								
-								<div>
-									<p className="text-gray-300 text-sm mb-2">Upside / Downside</p>
-									<p className={`text-4xl font-bold ${dcfResult.upside && dcfResult.upside > 0 ? 'text-green-400' : 'text-red-400'}`}>
+								<div className={`p-6 rounded-xl border-2 ${dcfResult.upside && dcfResult.upside > 0 ? 'bg-emerald-900/30 border-emerald-400/40' : 'bg-red-900/30 border-red-400/40'}`}>
+									<p className={`text-sm font-semibold mb-3 uppercase tracking-wide ${dcfResult.upside && dcfResult.upside > 0 ? 'text-emerald-100' : 'text-red-100'}`}>Upside / Downside</p>
+									<p className={`text-4xl font-bold drop-shadow-lg ${dcfResult.upside && dcfResult.upside > 0 ? 'text-emerald-300' : 'text-red-300'}`}>
 										{dcfResult.upside !== undefined ? `${dcfResult.upside.toFixed(2)}%` : 'N/A'}
 										{dcfResult.upside !== undefined && (dcfResult.upside > 0 ? ' 🚀' : ' 📉')}
 									</p>
@@ -475,92 +475,92 @@ export default function ValuationPage() {
 							</div>
 							
 							{/* Recommendation */}
-							<div>
-								<p className="text-lg text-gray-300">
-									<span className="font-semibold text-gray-100">Recommendation:</span>{' '}
-									{dcfResult.upside !== undefined && dcfResult.upside > 15 && <span className="text-green-400 font-bold">BUY 🚀</span>}
-									{dcfResult.upside !== undefined && dcfResult.upside >= -15 && dcfResult.upside <= 15 && <span className="text-yellow-400 font-bold">HOLD 📊</span>}
-									{dcfResult.upside !== undefined && dcfResult.upside < -15 && <span className="text-red-400 font-bold">SELL 📉</span>}
+							<div className="mt-6 pt-6 border-t border-emerald-500/20">
+								<p className="text-lg text-emerald-100 mb-2">
+									<span className="font-bold text-white">Recommendation:</span>{' '}
+									{dcfResult.upside !== undefined && dcfResult.upside > 15 && <span className="text-emerald-300 font-bold text-xl">BUY 🚀</span>}
+									{dcfResult.upside !== undefined && dcfResult.upside >= -15 && dcfResult.upside <= 15 && <span className="text-yellow-300 font-bold text-xl">HOLD 📊</span>}
+									{dcfResult.upside !== undefined && dcfResult.upside < -15 && <span className="text-red-300 font-bold text-xl">SELL 📉</span>}
 							{dcfResult.upside === undefined && <span className="text-gray-400">N/A</span>}
 						</p>
-						<p className="text-sm text-gray-200 mt-2">
-							<span className="font-bold text-white">WACC Used:</span> {formatPercent(dcfInputs.wacc)}
+						<p className="text-sm text-emerald-100 mt-2">
+							<span className="font-bold text-white">WACC Used:</span> <span className="text-emerald-300 font-semibold">{formatPercent(dcfInputs.wacc)}</span>
 						</p>
 					</div>
 				</div>						{/* DCF Assumptions */}
-						<div className="p-8">
-							<h2 className="text-2xl font-bold text-gray-100 mb-6">
+						<div className="p-8 bg-slate-800/60 backdrop-blur-sm border border-emerald-500/20 rounded-2xl shadow-2xl">
+							<h2 className="text-2xl font-bold text-white mb-6">
 								⚙️ DCF Assumptions & Inputs
 							</h2>
-							<p className="text-gray-300 text-sm mb-4">
+							<p className="text-emerald-100 text-sm mb-6 font-medium">
 								All metrics synced from Financial Understanding Agent for consistency
 							</p>
 							
-							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 								{/* Revenue & Growth */}
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Base Revenue (TTM)</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Base Revenue (TTM)</p>
 									<p className="text-xl font-bold text-white">${(dcfInputs.revenue / 1_000_000_000).toFixed(1)}B</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Revenue Growth Rate</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Revenue Growth Rate</p>
 									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.revenueGrowthRate)}</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Terminal Growth Rate</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Terminal Growth Rate</p>
 									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.terminalGrowthRate)}</p>
 								</div>
 								
 								{/* Margins & Rates */}
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Operating Margin</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Operating Margin</p>
 									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.operatingMargin)}</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Tax Rate</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Tax Rate</p>
 									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.taxRate)}</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">WACC</p>
+								<div className="bg-emerald-900/30 p-4 rounded-lg border-2 border-emerald-400/40">
+									<p className="text-xs font-semibold text-emerald-100 mb-2 uppercase tracking-wide">WACC</p>
 									<p className="text-xl font-bold text-emerald-300">{formatPercent(dcfInputs.wacc)}</p>
 								</div>
 								
 								{/* CapEx & Working Capital */}
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">CapEx (% of Revenue)</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">CapEx (% of Revenue)</p>
 									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.capexAsPercentOfRevenue)}</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">WC Change (% of Rev)</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">WC Change (% of Rev)</p>
 									<p className="text-xl font-bold text-white">{formatPercent(dcfInputs.workingCapitalChangeAsPercentOfRevenue)}</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Shares Outstanding</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Shares Outstanding</p>
 									<p className="text-xl font-bold text-white">{(dcfInputs.sharesOutstanding / 1000).toFixed(2)}B</p>
 								</div>
 								
 								{/* Debt & Cash */}
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Total Debt</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Total Debt</p>
 									<p className="text-xl font-bold text-white">${(dcfInputs.totalDebt / 1_000_000_000).toFixed(1)}B</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Cash & Equivalents</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Cash & Equivalents</p>
 									<p className="text-xl font-bold text-white">${(dcfInputs.cash / 1_000_000_000).toFixed(1)}B</p>
 								</div>
-								<div>
-									<p className="text-sm font-semibold text-gray-200 mb-1">Net Debt</p>
+								<div className="bg-slate-700/40 p-4 rounded-lg border border-slate-600/30">
+									<p className="text-xs font-semibold text-emerald-200 mb-2 uppercase tracking-wide">Net Debt</p>
 									<p className="text-xl font-bold text-white">${((dcfInputs.totalDebt - dcfInputs.cash) / 1_000_000_000).toFixed(1)}B</p>
 								</div>
 							</div>
 						</div>
 
 						{/* To be continued: DCF Table, Sensitivity Matrix */}
-						<div className="rounded-2xl p-8">
-							<h2 className="text-2xl font-bold text-gray-100 mb-4">
+						<div className="rounded-2xl p-8 bg-slate-800/60 backdrop-blur-sm border border-emerald-500/20 shadow-2xl">
+							<h2 className="text-2xl font-bold text-white mb-4">
 								📈 5-Year Projections
 							</h2>
-							<p className="text-gray-300 mb-4">Coming next: Full projection table, sensitivity analysis, and editable assumptions...</p>
+							<p className="text-emerald-100 mb-4 font-medium">Coming next: Full projection table, sensitivity analysis, and editable assumptions...</p>
 						</div>
 					</div>
 				)}
