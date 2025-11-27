@@ -66,6 +66,18 @@ export async function GET(req: NextRequest) {
 		};
 
 		/**
+		 * Format number for balance sheet (negative numbers with minus sign)
+		 */
+		const formatBalanceSheetNumber = (num: number): string => {
+			const formatted = formatNumber(Math.abs(num));
+			// If negative, prefix with minus sign
+			if (num < 0) {
+				return `-${formatted}`;
+			}
+			return formatted;
+		};
+
+		/**
 		 * Special formatting for income statement:
 		 * - Merge "$" with following number (e.g., "$", 294866 -> "$294,866")
 		 * - Group columns with same index together (remove nulls between values)
@@ -111,6 +123,56 @@ export async function GET(req: NextRequest) {
 			return formatted;
 		};
 
+		/**
+		 * Special formatting for balance sheet:
+		 * - Merge "$" with following number (e.g., "$", 294866 -> "$294,866")
+		 * - Format negative numbers with minus sign (e.g., -1234 -> "-1,234")
+		 * - Group columns with same index together (remove nulls between values)
+		 */
+		const formatBalanceSheetValues = (
+			values: (string | number | null)[]
+		): string[] => {
+			const formatted: string[] = [];
+			let i = 0;
+
+			while (i < values.length) {
+				// If we encounter "$"
+				if (values[i] === "$") {
+					// Check if next value is a number
+					if (
+						i + 1 < values.length &&
+						typeof values[i + 1] === "number"
+					) {
+						const num = values[i + 1] as number;
+						// Format number (with parentheses if negative)
+						const formattedNum = formatBalanceSheetNumber(num);
+						formatted.push(`$${formattedNum}`);
+						i += 2; // Skip both "$" and the number
+					} else {
+						formatted.push("$");
+						i += 1;
+					}
+				}
+				// If we encounter a number (without "$" before it)
+				else if (typeof values[i] === "number") {
+					const num = values[i] as number;
+					formatted.push(formatBalanceSheetNumber(num));
+					i += 1;
+				}
+				// Skip null values
+				else if (values[i] === null || values[i] === undefined) {
+					i += 1;
+				}
+				// Other values (strings)
+				else {
+					formatted.push(String(values[i]));
+					i += 1;
+				}
+			}
+
+			return formatted;
+		};
+
 		// Convert parsed tables to format expected by FinancialStatementsViewer
 		// Component expects: table.data = string[][] (2D array with headers in first row)
 		const tables = tablesData.parsed.map((t) => {
@@ -127,6 +189,13 @@ export async function GET(req: NextRequest) {
 				// Special formatting for income statement
 				if (t.type === "income_statement") {
 					const formattedValues = formatIncomeStatementValues(
+						row.values
+					);
+					dataRow.push(...formattedValues);
+				}
+				// Special formatting for balance sheet (handles parentheses for negative numbers)
+				else if (t.type === "balance_sheet") {
+					const formattedValues = formatBalanceSheetValues(
 						row.values
 					);
 					dataRow.push(...formattedValues);
