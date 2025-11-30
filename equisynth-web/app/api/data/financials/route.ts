@@ -425,35 +425,47 @@ export async function GET(req: NextRequest) {
 
 			// Add data rows
 			for (const row of t.rows) {
-				const dataRow: string[] = [row.label]; // First column is label
+				let label = row.label; // First column is label
+				let formattedValues: string[] = [];
 
 				// Special formatting for income statement
 				if (t.type === "income_statement") {
-					const formattedValues = formatIncomeStatementValues(
-						row.values
-					);
-					dataRow.push(...formattedValues);
+					formattedValues = formatIncomeStatementValues(row.values);
 				}
 				// Special formatting for balance sheet (handles parentheses for negative numbers)
 				else if (t.type === "balance_sheet") {
-					const formattedValues = formatBalanceSheetValues(
-						row.values
-					);
-					dataRow.push(...formattedValues);
+					formattedValues = formatBalanceSheetValues(row.values);
 				} else {
 					// Default formatting for other table types
 					for (const value of row.values) {
 						if (value === null || value === undefined) {
-							dataRow.push("");
+							formattedValues.push("");
 						} else if (typeof value === "number") {
 							// Format numbers with thousand separators
-							dataRow.push(formatNumber(value));
+							formattedValues.push(formatNumber(value));
 						} else {
-							dataRow.push(String(value));
+							formattedValues.push(String(value));
 						}
 					}
 				}
 
+				// Check if values are empty (all empty strings or no values)
+				const hasValues = formattedValues.some(
+					(v) => v && v.trim() && v.trim() !== ""
+				);
+
+				// If no values, format label with colon and mark for bold
+				if (!hasValues && label) {
+					// Check if label already ends with colon, if so don't add another one
+					const trimmedLabel = label.trim();
+					if (trimmedLabel.endsWith(":")) {
+						label = `**${trimmedLabel}**`;
+					} else {
+						label = `**${trimmedLabel}:**`;
+					}
+				}
+
+				const dataRow: string[] = [label, ...formattedValues];
 				data.push(dataRow);
 			}
 
@@ -480,4 +492,5 @@ export async function GET(req: NextRequest) {
 		);
 	}
 }
+
 

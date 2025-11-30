@@ -166,11 +166,29 @@ export default function FinancialStatementsViewer({
 									key={rowIndex}
 									className={rowIndex % 2 === 0 ? "bg-white" : "bg-gray-100"}
 								>
-									{row?.map((cell: string, cellIndex: number) => (
-										<td key={cellIndex} className="px-4 py-2 text-gray-800">
-											{cell}
-										</td>
-									))}
+									{row?.map((cell: string, cellIndex: number) => {
+										// Check if label cell (first column) has bold markdown format
+										const isBoldLabel =
+											cellIndex === 0 &&
+											cell &&
+											cell.startsWith("**") &&
+											cell.endsWith("**");
+										
+										const cellContent = isBoldLabel
+											? cell.replace(/^\*\*|\*\*$/g, "")
+											: cell;
+										
+										return (
+											<td
+												key={cellIndex}
+												className={`px-4 py-2 text-gray-800 ${
+													isBoldLabel ? "font-bold" : ""
+												}`}
+											>
+												{cellContent}
+											</td>
+										);
+									})}
 								</tr>
 							))}
 						</tbody>
