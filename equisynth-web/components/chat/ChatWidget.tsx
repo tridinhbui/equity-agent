@@ -48,6 +48,7 @@ export default function ChatWidget({
 	const [historyOpen, setHistoryOpen] = useState(false);
 	const [loadingHistory, setLoadingHistory] = useState(false);
 	const [loadingConversation, setLoadingConversation] = useState(false);
+	const [dbStatus, setDbStatus] = useState<"connected" | "error" | "unknown">("unknown");
 	const messagesEndRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const historyRef = useRef<HTMLDivElement>(null);
@@ -66,10 +67,10 @@ export default function ChatWidget({
 
 	// Load conversation history when widget opens
 	useEffect(() => {
-		if (isOpen && session?.user) {
+		if (isOpen) {
 			loadConversationHistory();
 		}
-	}, [isOpen, session]);
+	}, [isOpen]);
 
 	// Close history dropdown when clicking outside
 	useEffect(() => {
@@ -89,23 +90,25 @@ export default function ChatWidget({
 	}, [historyOpen]);
 
 	const loadConversationHistory = async () => {
-		if (!session?.user) return;
-
+		// Allow loading history even without session (for dev/testing)
 		setLoadingHistory(true);
 		try {
 			const res = await fetch("/api/chat/sessions");
 			if (res.ok) {
 				const data = await res.json();
 				setConversations(data.sessions || []);
+				setDbStatus("connected");
 			} else {
-				// Database might not be configured - silently fail
 				const errorData = await res.json().catch(() => ({}));
+				console.error("[loadConversationHistory] API error:", errorData);
+				setDbStatus("error");
 				if (errorData.error?.includes("Database not configured")) {
 					setConversations([]);
 				}
 			}
 		} catch (err) {
-			console.error("Failed to load conversation history:", err);
+			console.error("[loadConversationHistory] Exception:", err);
+			setDbStatus("error");
 			setConversations([]);
 		} finally {
 			setLoadingHistory(false);
@@ -113,13 +116,31 @@ export default function ChatWidget({
 	};
 
 	const createNewSession = async (): Promise<number | null> => {
-		if (!session?.user) return null;
+		// Get userId with fallback for dev/testing
+		let userId: string | null = null;
+		if (session?.user) {
+			userId = (session.user as any).id || session.user.email || null;
+		}
+		
+		// Fallback to localStorage for dev/testing
+		if (!userId) {
+			const tempUserId = localStorage.getItem('temp_user_id');
+			if (tempUserId) {
+				userId = tempUserId;
+			} else {
+				userId = `temp-user-${Date.now()}`;
+				localStorage.setItem('temp_user_id', userId);
+			}
+			console.warn("[createNewSession] Using fallback userId:", userId);
+		}
 
 		try {
 			// Generate a title from the first message if available
 			const title = input.trim()
 				? `${input.trim().substring(0, 50)}${input.trim().length > 50 ? "..." : ""}`
 				: `Chat about ${ticker} ${form}`;
+
+			console.log("[createNewSession] Creating session with userId:", userId);
 
 			const res = await fetch("/api/chat/sessions", {
 				method: "POST",
@@ -129,24 +150,41 @@ export default function ChatWidget({
 					form,
 					filed,
 					title,
+					userId, // Include userId in body for fallback
 				}),
 			});
 
 			if (res.ok) {
 				const data = await res.json();
-				return data.session.id;
+				if (data.session && data.session.id) {
+					console.log("[createNewSession] ✅ Session created:", data.session.id);
+					setDbStatus("connected");
+					return data.session.id;
+				} else {
+					throw new Error("Session creation returned invalid response");
+				}
 			} else {
-				// Database might not be configured - return null to allow chat without persistence
 				const errorData = await res.json().catch(() => ({}));
-				if (errorData.error?.includes("Database not configured")) {
-					console.warn("Database not configured - conversations will not be saved");
-					return null;
+				console.error("[createNewSession] ❌ API error:", errorData);
+				setDbStatus("error");
+				
+				// Show specific error message
+				const errorMessage = errorData.error || "Failed to create session";
+				const errorCode = errorData.code || "UNKNOWN";
+				
+				if (errorCode === "DATABASE_NOT_CONFIGURED") {
+					throw new Error("Database not configured. Please set DATABASE_URL in .env.local");
+				} else if (errorCode === "DATABASE_INIT_FAILED" || errorCode === "DATABASE_ERROR") {
+					throw new Error("Database connection failed. Please check your database configuration.");
+				} else {
+					throw new Error(errorMessage);
 				}
 			}
-		} catch (err) {
-			console.error("Failed to create session:", err);
+		} catch (err: any) {
+			console.error("[createNewSession] ❌ Exception:", err);
+			setDbStatus("error");
+			throw err; // Re-throw to be caught by caller
 		}
-		return null;
 	};
 
 	const saveMessage = async (
@@ -215,25 +253,49 @@ export default function ChatWidget({
 		}
 	};
 
-	const handleNewChat = () => {
+	const handleNewChat = async () => {
+		console.log("[handleNewChat] Starting new chat...");
 		setMessages([]);
 		setActiveSessionId(null);
 		setHistoryOpen(false);
 		setInput("");
+		
+		// CRITICAL: Immediately refresh history to show the session that just finished
+		console.log("[handleNewChat] Refreshing conversation history...");
+		await loadConversationHistory();
+		console.log("[handleNewChat] History refreshed");
 	};
 
 	const handleSend = async () => {
-		if (!input.trim() || loading || !filed || !session?.user) return;
+		if (!input.trim() || loading || !filed) return;
 
-		// Create session if we don't have one (only if database is configured)
+		// CRITICAL: Ensure we have a valid sessionId before proceeding
 		let sessionId = activeSessionId;
+		
 		if (!sessionId) {
-			sessionId = await createNewSession();
-			// If sessionId is null, database might not be configured - continue anyway
-			if (sessionId) {
+			console.log("[handleSend] No active session, creating new one...");
+			try {
+				sessionId = await createNewSession();
+				if (!sessionId) {
+					// Session creation failed - STOP and show error
+					alert("Cannot save chat: Database Error. Please check your database configuration.");
+					return; // STOP - don't allow chat if history cannot be saved
+				}
 				setActiveSessionId(sessionId);
-				await loadConversationHistory(); // Refresh history
+				await loadConversationHistory(); // Refresh history after creating session
+			} catch (err: any) {
+				// Session creation threw an error - STOP and show error
+				console.error("[handleSend] Failed to create session:", err);
+				alert(`Cannot save chat: ${err.message || "Database Error"}`);
+				return; // STOP - don't allow chat if history cannot be saved
 			}
+		}
+
+		// CRITICAL: Verify sessionId exists before saving message
+		if (!sessionId) {
+			console.error("[handleSend] ❌ sessionId is null after creation attempt");
+			alert("Cannot save chat: Session ID is missing. Please try again.");
+			return;
 		}
 
 		const userMessage: Message = {
@@ -244,6 +306,8 @@ export default function ChatWidget({
 		};
 
 		setMessages((prev) => [...prev, userMessage]);
+		
+		// Save user message - sessionId is guaranteed to be non-null here
 		await saveMessage(sessionId, "user", input.trim());
 		setInput("");
 		setLoading(true);
@@ -295,12 +359,20 @@ export default function ChatWidget({
 			};
 
 			setMessages((prev) => [...prev, assistantMessage]);
-			await saveMessage(
-				sessionId,
-				"assistant",
-				chatData.answer,
-				chatData.sources
-			);
+			
+			// CRITICAL: Verify sessionId before saving assistant message
+			if (sessionId) {
+				await saveMessage(
+					sessionId,
+					"assistant",
+					chatData.answer,
+					chatData.sources
+				);
+				// Refresh history after saving to show updated conversation
+				await loadConversationHistory();
+			} else {
+				console.error("[handleSend] ❌ Cannot save assistant message - sessionId is null");
+			}
 		} catch (err: any) {
 			const errorMessage: Message = {
 				id: (Date.now() + 1).toString(),
@@ -310,13 +382,19 @@ export default function ChatWidget({
 				error: err.message,
 			};
 			setMessages((prev) => [...prev, errorMessage]);
-			await saveMessage(
-				sessionId,
-				"assistant",
-				errorMessage.content,
-				undefined,
-				err.message
-			);
+			
+			// CRITICAL: Verify sessionId before saving error message
+			if (sessionId) {
+				await saveMessage(
+					sessionId,
+					"assistant",
+					errorMessage.content,
+					undefined,
+					err.message
+				);
+			} else {
+				console.error("[handleSend] ❌ Cannot save error message - sessionId is null");
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -502,6 +580,32 @@ export default function ChatWidget({
 					<p className="text-xs text-gray-500 mt-2">
 						Please fetch and process a filing first
 					</p>
+				)}
+				
+				{/* Debug Status Indicator (visible in dev mode - check window.location) */}
+				{(typeof window !== "undefined" && (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")) && (
+					<div className="mt-2 p-2 bg-gray-100 rounded text-xs font-mono border border-gray-300">
+						<div className="flex items-center gap-4 flex-wrap">
+							<div>
+								<span className="text-gray-600">SessionID:</span>{" "}
+								<span className={activeSessionId ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+									{activeSessionId || "null"}
+								</span>
+							</div>
+							<div>
+								<span className="text-gray-600">DB Status:</span>{" "}
+								<span className={
+									dbStatus === "connected" ? "text-green-600 font-bold" :
+									dbStatus === "error" ? "text-red-600 font-bold" :
+									"text-yellow-600 font-bold"
+								}>
+									{dbStatus === "connected" ? "Connected" :
+									 dbStatus === "error" ? "Error" :
+									 "Unknown"}
+								</span>
+							</div>
+						</div>
+					</div>
 				)}
 			</div>
 		</div>
