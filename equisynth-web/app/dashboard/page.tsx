@@ -8,6 +8,8 @@ import FactGrid from "@/components/agent/FactGrid";
 import MetricList from "@/components/agent/MetricList";
 import ResultList from "@/components/agent/ResultList";
 import PipelineExplainerCard from "@/components/agent/PipelineExplainerCard";
+import ChatBubble from "@/components/chat/ChatBubble";
+import ChatWidget from "@/components/chat/ChatWidget";
 
 export default function DashboardPage() {
 	const [ticker, setTicker] = useState("");
@@ -25,6 +27,7 @@ export default function DashboardPage() {
 	const [askResults, setAskResults] = useState<any[] | null>(null);
 	const [embedStatus, setEmbedStatus] = useState<any>(null);
 	const [embedLoading, setEmbedLoading] = useState(false);
+	const [chatOpen, setChatOpen] = useState(false);
 
 	async function fetchFiling(e: React.FormEvent) {
 		e.preventDefault();
@@ -684,37 +687,28 @@ export default function DashboardPage() {
 								</div>
 							</div>
 
-							{/* Ask Questions */}
-							<div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-									<h3 className="text-lg font-semibold mb-4">💬 Ask Questions</h3>
-									<div className="flex gap-3">
-										<input
-											value={ask}
-											onChange={(e)=>setAsk(e.target.value)}
-											placeholder="What are the main risk factors?"
-											className="flex-1 border-2 border-gray-300 rounded-lg px-4 py-2.5 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-											onKeyDown={(e)=>{ if (e.key==='Enter' && !askLoading) { runQuery(); }}}
-										/>
-										<button
-											onClick={runQuery}
-											className="px-5 py-2.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 disabled:opacity-50"
-											disabled={askLoading}
-										>
-											{askLoading ? "Searching…" : "🔎 Search"}
-										</button>
-									</div>
-
-									{askResults && (
-										<div className="mt-4">
-											<ResultList results={askResults} />
-										</div>
-									)}
-								</div>
 							</div>
 						</div>
 					</div>
 				)}
 			</div>
+
+			{/* Chat Widget */}
+			{result && (
+				<>
+					<ChatBubble
+						onClick={() => setChatOpen(!chatOpen)}
+						isOpen={chatOpen}
+					/>
+					<ChatWidget
+						ticker={ticker}
+						form={result.form}
+						filed={result.filed}
+						isOpen={chatOpen}
+						onClose={() => setChatOpen(false)}
+					/>
+				</>
+			)}
 		</AppShell>
 	);
 }

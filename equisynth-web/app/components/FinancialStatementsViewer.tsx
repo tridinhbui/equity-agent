@@ -16,12 +16,14 @@ export default function FinancialStatementsViewer({
 	const [loading, setLoading] = useState(false);
 	const [data, setData] = useState<any>(null);
 	const [error, setError] = useState("");
+	const [volume, setVolume] = useState<number | null>(null);
 	const [activeTab, setActiveTab] = useState<
 		"income" | "balance" | "cashflow" | "all"
 	>("all");
 
 	useEffect(() => {
 		loadFinancials();
+		loadVolume();
 	}, [ticker, form, filed]);
 
 	async function loadFinancials() {
@@ -42,6 +44,39 @@ export default function FinancialStatementsViewer({
 			setError(err?.message || "Unknown error");
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	async function loadVolume() {
+		try {
+			const res = await fetch(`/api/market/quote?ticker=${ticker}`);
+			if (res.ok) {
+				const quoteData = await res.json();
+				setVolume(quoteData.volume || null);
+			}
+		} catch (err) {
+			console.warn("Failed to fetch volume:", err);
+			// Continue without volume
+		}
+	}
+
+	function formatVolume(vol: number | null): string {
+		if (vol == null || vol === 0) return "N/A";
+		// Normalize volume: if volume is a decimal number < 1000, it might be in millions already
+		// Convert to actual shares (multiply by 1M)
+		let normalizedVol = vol;
+		if (vol > 0 && vol < 1000 && vol % 1 !== 0) {
+			normalizedVol = vol * 1_000_000;
+		}
+		// Format volume consistently: use B for billions, M for millions, K for thousands
+		if (Math.abs(normalizedVol) >= 1_000_000_000) {
+			return `${(normalizedVol / 1_000_000_000).toFixed(2)}B shares`;
+		} else if (Math.abs(normalizedVol) >= 1_000_000) {
+			return `${(normalizedVol / 1_000_000).toFixed(2)}M shares`;
+		} else if (Math.abs(normalizedVol) >= 1_000) {
+			return `${(normalizedVol / 1_000).toFixed(2)}K shares`;
+		} else {
+			return `${normalizedVol.toLocaleString()} shares`;
 		}
 	}
 
@@ -129,6 +164,26 @@ export default function FinancialStatementsViewer({
 			);
 		}
 
+		// Prepare table data - add volume row for income statements
+		const tableRows = [...table.data.slice(1)];
+		const isIncomeStatement = table.type === "income_statement";
+		
+		// Add volume row to income statements if volume is available
+		if (isIncomeStatement && volume !== null && volume !== undefined && volume > 0) {
+			const headerRow = table.data[0];
+			const volumeRow: string[] = ["Volume (24h)"];
+			// Only show volume in the last column (most recent period), leave others empty
+			for (let i = 1; i < headerRow.length; i++) {
+				// Show volume only in the last column
+				if (i === headerRow.length - 1) {
+					volumeRow.push(formatVolume(volume));
+				} else {
+					volumeRow.push(""); // Empty for other columns
+				}
+			}
+			tableRows.push(volumeRow);
+		}
+
 		return (
 			<div
 				key={index}
@@ -161,18 +216,37 @@ export default function FinancialStatementsViewer({
 							</tr>
 						</thead>
 						<tbody>
-							{table.data.slice(1).map((row: string[], rowIndex: number) => (
-								<tr
-									key={rowIndex}
-									className={rowIndex % 2 === 0 ? "bg-white" : "bg-gray-100"}
-								>
-									{row?.map((cell: string, cellIndex: number) => (
-										<td key={cellIndex} className="px-4 py-2 text-gray-800">
-											{cell}
-										</td>
-									))}
-								</tr>
-							))}
+							{tableRows.map((row: string[], rowIndex: number) => {
+								const isVolumeRow = isIncomeStatement && 
+									rowIndex === tableRows.length - 1 && 
+									row[0] === "Volume (24h)";
+								
+								return (
+									<tr
+										key={rowIndex}
+										className={
+											isVolumeRow
+												? "bg-blue-50 border-t-2 border-blue-300"
+												: rowIndex % 2 === 0
+												? "bg-white"
+												: "bg-gray-100"
+										}
+									>
+										{row?.map((cell: string, cellIndex: number) => (
+											<td
+												key={cellIndex}
+												className={`px-4 py-2 ${
+													isVolumeRow
+														? "text-blue-900 font-bold"
+														: "text-gray-800"
+												}`}
+											>
+												{cell}
+											</td>
+										))}
+									</tr>
+								);
+							})}
 						</tbody>
 					</table>
 				</div>
