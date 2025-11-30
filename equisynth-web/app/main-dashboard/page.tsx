@@ -82,20 +82,6 @@ export default function MainDashboard() {
     nvda: generateSparklineData('up')
   };
 
-  const recentActivity = [
-    { id: 1, title: 'NVDA Q3 valuation generated', time: '30s ago', icon: BarChart3, color: 'text-green-600', bg: 'bg-green-100' },
-    { id: 2, title: '10-K extraction completed for AAPL', time: '2m ago', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' },
-    { id: 3, title: 'New macro insights report available', time: '5m ago', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100' },
-    { id: 4, title: 'Sentiment analysis: Tech sector bullish', time: '12m ago', icon: Activity, color: 'text-cyan-600', bg: 'bg-cyan-100' }
-  ];
-
-  const exploreTools = [
-    { id: 1, title: 'Financial Models', desc: 'DCF, Comps, LBO', icon: PieChart, gradient: 'from-[#4A90E2] to-[#7BB3FF]' },
-    { id: 2, title: 'Industry Benchmarks', desc: 'Peer analysis', icon: BarChart3, gradient: 'from-[#6B8DD6] to-[#8FA8E0]' },
-    { id: 3, title: 'Automated Reports', desc: 'Custom exports', icon: FileText, gradient: 'from-[#5C9DE5] to-[#7DB4F0]' },
-    { id: 4, title: 'SEC Filings Parser', desc: 'Real-time data', icon: Database, gradient: 'from-[#4E95E0] to-[#72ACEC]' }
-  ];
-
   const userInitials = session?.user?.name
     ? session.user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
     : 'JD';
@@ -246,65 +232,6 @@ export default function MainDashboard() {
               </div>
             </div>
           </div>
-        </section>
-
-        {/* Bottom Section: Activity & Tools */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-          {/* Recent Activity Feed */}
-          <div className="lg:col-span-2 bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-slate-900">Recent Activity</h3>
-              <button className="text-sm font-medium text-[#4A90E2] hover:text-[#357ABD] transition-colors">View All</button>
-            </div>
-
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="group flex items-center gap-4 p-4 rounded-2xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100">
-                  <div className={`w-12 h-12 rounded-xl ${activity.bg} flex items-center justify-center shrink-0`}>
-                    <activity.icon className={`w-5 h-5 ${activity.color}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-bold text-slate-900 truncate">{activity.title}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">{activity.time} · Automated System</p>
-                  </div>
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="p-2 hover:bg-white rounded-lg shadow-sm border border-slate-200 text-slate-400 hover:text-[#4A90E2]">
-                      <ArrowUpRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Explore Tools Mini-Grid */}
-          <div className="lg:col-span-1 bg-gradient-to-br from-slate-900 to-slate-800 rounded-[2rem] p-8 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-
-            <h3 className="text-xl font-bold mb-6 relative z-10">Explore Tools</h3>
-
-            <div className="grid grid-cols-1 gap-3 relative z-10">
-              {exploreTools.map((tool) => (
-                <button key={tool.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/10 hover:bg-white/20 transition-colors backdrop-blur-sm border border-white/5 text-left group">
-                  <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${tool.gradient} flex items-center justify-center shadow-lg`}>
-                    <tool.icon className="w-5 h-5 text-white" />
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold group-hover:text-blue-200 transition-colors">{tool.title}</div>
-                    <div className="text-[10px] text-slate-400">{tool.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <div className="mt-6 pt-6 border-t border-white/10 text-center">
-              <button className="text-xs font-medium text-slate-400 hover:text-white transition-colors">
-                View All Applications
-              </button>
-            </div>
-          </div>
-
         </section>
 
       </main>
